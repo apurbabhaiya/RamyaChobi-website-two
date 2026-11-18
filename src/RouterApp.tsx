@@ -14,6 +14,7 @@ import AlbumGalleryPage from "./home/AlbumGalleryPage";
 import FacebookAccessGate from "./home/FacebookAccessGate";
 import SpinResultSubmission from "./home/SpinResultSubmission";
 import WeddingInvitationGuest from "./invitations/WeddingInvitationGuest";
+import WeddingInvitationLanding from "./invitations/WeddingInvitationLanding";
 
 const withChat = (page: React.ReactNode) => /^(\/booking\/admin|\/delivery-admin|\/studio)(\/|$)/.test(window.location.pathname) ? <>{page}</> : <>{page}<RamyaChatWidget /></>;
 
@@ -21,7 +22,7 @@ export default function RouterApp() {
   const path = window.location.pathname;
 
   useEffect(() => {
-    const isPublicPage = path === "/" || path === "/about" || path === "/packages" || path === "/portfolio" || path === "/stories" || path === "/blog";
+    const isPublicPage = path === "/" || path === "/about" || path === "/packages" || path === "/portfolio" || path === "/stories" || path === "/blog" || path === "/wedding-invitations";
     let robots = document.querySelector('meta[name="robots"]') as HTMLMetaElement | null;
     if (!robots) {
       robots = document.createElement("meta");
@@ -36,6 +37,8 @@ export default function RouterApp() {
     document.title =
       path === "/"
         ? "RamyaChobi · Photography & Cinematography"
+        : path === "/wedding-invitations"
+          ? "Digital Wedding Invitations & Photography | RamyaChobi"
         : path === "/invitation"
           ? "Wedding Invitation · RamyaChobi"
         : path === "/about"
@@ -67,6 +70,7 @@ export default function RouterApp() {
   if (path === "/") return (<RamyaChobiHome />);
   if (path === "/spin-result") return <SpinResultSubmission />;
   if (path === "/invitation") return <WeddingInvitationGuest />;
+  if (path === "/wedding-invitations") return <WeddingInvitationLanding />;
   if (path === "/about") return (<RamyaChobiAbout />);
   if (path === "/packages") return (<RamyaChobiPackages />);
   if (path === "/portfolio") return (<PortfolioPage />);
