@@ -29,32 +29,33 @@ export default function WeddingInvitationGuest() {
     </main>
   );
 
-  const dateValid = Boolean(invite.date) && /^\d{4}-\d{2}-\d{2}$/.test(invite.date);
+  const currentInvite = invite;
+  const dateValid = Boolean(currentInvite.date) && /^\d{4}-\d{2}-\d{2}$/.test(currentInvite.date);
   function calendarLink() {
     if (!dateValid) return '';
-    const end = new Date(invite.date + 'T00:00:00Z');
+    const end = new Date(currentInvite.date + 'T00:00:00Z');
     end.setUTCDate(end.getUTCDate() + 1);
-    const dateCompact = invite.date.replaceAll('-', '');
+    const dateCompact = currentInvite.date.replaceAll('-', '');
     const endCompact = end.toISOString().slice(0,10).replaceAll('-', '');
-    const when = invite.time ? 'dates='+dateCompact+'T'+invite.time.replace(':','')+'00/'+dateCompact+'T'+invite.time.replace(':','')+'00' : 'dates='+dateCompact+'/'+endCompact;
+    const when = currentInvite.time ? 'dates='+dateCompact+'T'+currentInvite.time.replace(':','')+'00/'+dateCompact+'T'+currentInvite.time.replace(':','')+'00' : 'dates='+dateCompact+'/'+endCompact;
     // Google Calendar start time is interpreted as local timezone when ctz is present.
-    return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(invite.occasion+' · '+invite.bride+' & '+invite.groom)+'&'+when+'&ctz=Asia%2FDhaka&details='+encodeURIComponent(invite.message)+'&location='+encodeURIComponent([invite.venue,invite.address].filter(Boolean).join(', '));
+    return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(currentInvite.occasion+' · '+currentInvite.bride+' & '+currentInvite.groom)+'&'+when+'&ctz=Asia%2FDhaka&details='+encodeURIComponent(currentInvite.message)+'&location='+encodeURIComponent([currentInvite.venue,currentInvite.address].filter(Boolean).join(', '));
   }
-  const venueQuery = [invite.venue,invite.address].filter(Boolean).join(', ');
+  const venueQuery = [currentInvite.venue,currentInvite.address].filter(Boolean).join(', ');
   return <main className="min-h-dvh overflow-hidden bg-[radial-gradient(ellipse_at_top,#fff9ef,#e6dbc6_70%,#c4af8c)] px-3 py-7 text-stone-900 sm:py-12">
     <div className="mx-auto max-w-xl text-center">
       <div className="text-xs font-bold uppercase tracking-[.25em] text-amber-900">A little love. A beautiful moment.</div>
       <h1 className="mt-3 font-serif text-3xl font-semibold sm:text-4xl">You're Invited</h1>
-      <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-stone-700">Tap the invitation to unfold a special message from {invite.bride} and {invite.groom}.</p>
+      <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-stone-700">Tap the invitation to unfold a special message from {currentInvite.bride} and {currentInvite.groom}.</p>
       <WeddingInviteCard invite={invite}/>
       <div className="mt-2 rounded-3xl border border-white/80 bg-white/75 p-5 shadow-sm backdrop-blur-sm">
-        <p className="font-serif text-xl font-semibold">{invite.occasion}</p>
-        <p className="mt-2 text-sm"><CalendarDays size={16} className="mr-2 inline text-amber-800"/>{readableDate(invite.date)} · {readableTime(invite.time)}</p>
+        <p className="font-serif text-xl font-semibold">{currentInvite.occasion}</p>
+        <p className="mt-2 text-sm"><CalendarDays size={16} className="mr-2 inline text-amber-800"/>{readableDate(currentInvite.date)} · {readableTime(currentInvite.time)}</p>
         {venueQuery && <p className="mt-2 text-sm"><MapPin size={16} className="mr-2 inline text-amber-800"/>{venueQuery}</p>}
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           {dateValid && <a href={calendarLink()} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-bold"><CalendarDays size={16}/> Add to calendar</a>}
           {venueQuery && <a href={'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(venueQuery)} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#193c32] px-4 py-2 text-sm font-bold text-white"><MapPin size={16}/> Directions</a>}
-          {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && <button type="button" onClick={() => {void navigator.share({title:'Wedding Invitation',text:invite.bride+' & '+invite.groom,url:window.location.href}).catch(()=>{});}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-bold"><Share2 size={16}/> Share</button>}
+          {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && <button type="button" onClick={() => {void navigator.share({title:'Wedding Invitation',text:currentInvite.bride+' & '+currentInvite.groom,url:window.location.href}).catch(()=>{});}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-bold"><Share2 size={16}/> Share</button>}
         </div>
         <div className="mt-6 border-t border-amber-200 pt-4"><p className="font-serif text-xs tracking-[.2em] text-stone-500">WITH LOVE FROM</p><a href="/" className="mt-1 block font-serif text-lg font-bold text-[#193c32]">RAMYACHOBI</a></div>
       </div>
