@@ -1,0 +1,52 @@
+/*
+ * RamyaChobi lightweight 3D accents
+ * No canvas / WebGL / third-party scripts. Existing brand palette and layout
+ * are retained. Depth is produced by composited transforms and gradients.
+ */
+.rc-home-3d{--rc-ink:#19382e;--rc-forest:#193e32;--rc-brass:#b18b57;--rc-cream:#f8f6ef;isolation:isolate}
+.rc-home-3d .rc-hero-section{position:relative;isolation:isolate}
+.rc-home-3d .rc-hero-section::before{content:"";position:absolute;z-index:-1;inset:0;pointer-events:none;background:radial-gradient(ellipse at 85% 21%,rgba(177,139,87,.15),transparent 43%),radial-gradient(ellipse at 6% 84%,rgba(25,62,50,.06),transparent 42%)}
+.rc-home-3d .rc-hero-copy{position:relative;z-index:1}
+.rc-home-3d .rc-hero-title-accent{display:inline-block;color:#8a6740;text-shadow:0 1px 0 #fff,0 6px 20px rgba(138,103,64,.12)}
+.rc-home-3d .rc-hero-scene{position:relative;perspective:1350px;transform-style:preserve-3d;min-width:0}
+.rc-home-3d .rc-hero-scene::before{content:"";position:absolute;z-index:-1;inset:9% -1% -2% 7%;border:1.5px solid rgba(177,139,87,.55);border-radius:36px;transform:translate3d(12px,12px,-28px) rotate(2deg);pointer-events:none}
+.rc-home-3d .rc-hero-frame{position:relative;z-index:1;transform:rotateY(-6deg) rotateX(2deg) translateZ(0);transform-origin:center;backface-visibility:hidden;box-shadow:0 22px 55px rgba(17,41,33,.22),0 6px 18px rgba(17,41,33,.12),inset 0 0 0 1px rgba(255,255,255,.35);transition:transform .65s cubic-bezier(.2,.75,.25,1),box-shadow .65s ease;will-change:auto}
+.rc-home-3d .rc-hero-scene:hover .rc-hero-frame{transform:rotateY(0deg) rotateX(0deg) translate3d(0,-4px,16px);box-shadow:0 26px 65px rgba(17,41,33,.25),0 9px 24px rgba(17,41,33,.11)}
+.rc-home-3d .rc-hero-frame img{transform:scale(1.01);transition:transform .8s ease}
+.rc-home-3d .rc-hero-scene:hover .rc-hero-frame img{transform:scale(1.055)}
+.rc-home-3d .rc-hero-glass{position:absolute;z-index:4;bottom:14px;left:14px;right:14px;border:1px solid rgba(255,255,255,.75);box-shadow:0 10px 25px rgba(23,57,44,.13);transform:translateZ(28px);transition:transform .5s ease}
+.rc-home-3d .rc-hero-scene:hover .rc-hero-glass{transform:translate3d(0,-3px,35px)}
+.rc-home-3d .rc-hero-decor{position:absolute;z-index:3;top:20px;right:18px;display:flex;align-items:center;gap:6px;padding:9px 12px;color:#fff7e1;background:rgba(25,62,50,.82);border:1px solid rgba(241,208,136,.55);border-radius:100px;font-size:10px;font-weight:800;letter-spacing:.11em;box-shadow:0 8px 20px rgba(18,40,31,.22);pointer-events:none;backdrop-filter:blur(7px)}
+.rc-home-3d .rc-hero-decor svg{width:14px;height:14px;color:#f0cb87}
+.rc-home-3d .rc-depth-link{position:relative;box-shadow:0 5px 0 rgba(12,53,38,.19),0 11px 24px rgba(18,56,40,.09);transition:transform .22s ease,box-shadow .22s ease}
+.rc-home-3d .rc-depth-link:hover{transform:translate3d(0,-2px,0);box-shadow:0 7px 0 rgba(12,53,38,.15),0 14px 26px rgba(18,56,40,.14)}
+.rc-home-3d .rc-depth-link:active{transform:translate3d(0,2px,0);box-shadow:0 1px 0 rgba(12,53,38,.16)}
+.rc-home-3d .rc-depth-grid{perspective:1150px}
+.rc-home-3d .rc-depth-tile{position:relative;transform:translate3d(0,0,0);transform-origin:50% 70%;box-shadow:0 3px 6px rgba(25,56,46,.04),0 9px 23px rgba(25,56,46,.035);transition:transform .32s cubic-bezier(.19,.75,.3,1),box-shadow .32s ease,border-color .32s ease;backface-visibility:hidden}
+.rc-home-3d .rc-depth-tile:hover{transform:translate3d(0,-5px,12px) rotateX(2deg) rotateY(-2deg);box-shadow:0 15px 34px rgba(25,56,46,.14),0 3px 8px rgba(25,56,46,.06)}
+.rc-home-3d .rc-photo-grid{perspective:1250px}
+.rc-home-3d .rc-photo-depth{transform:translate3d(0,0,0);transform-style:preserve-3d;backface-visibility:hidden;box-shadow:0 6px 16px rgba(30,44,34,.09);transition:transform .42s cubic-bezier(.2,.72,.25,1),box-shadow .42s ease}
+.rc-home-3d .rc-photo-depth:hover{transform:translate3d(0,-6px,16px) rotateY(3deg) rotateX(-2deg);box-shadow:0 18px 36px rgba(30,44,34,.22)}
+.rc-home-3d .rc-photo-depth:nth-child(even):hover{transform:translate3d(0,-6px,16px) rotateY(-3deg) rotateX(-2deg)}
+.rc-home-3d .rc-photo-depth img{transition:transform .6s cubic-bezier(.2,.72,.25,1)}
+.rc-home-3d .rc-photo-depth:hover img{transform:scale(1.055)}
+.rc-home-3d .rc-service-depth{border-radius:20px;background:linear-gradient(148deg,#fff 40%,#f3f4e9);border:1px solid rgba(25,56,46,.11)}
+.rc-home-3d .rc-step-depth{background:rgba(255,255,255,.7);border:1px solid rgba(25,56,46,.09);border-radius:18px;padding:15px;box-shadow:0 6px 18px rgba(25,56,46,.05)}
+.rc-home-3d .rc-menu-brand{box-shadow:0 5px 12px rgba(25,62,50,.22),inset 0 1px 0 rgba(255,255,255,.3);transform:rotate(-4deg);transition:transform .35s ease}
+.rc-home-3d .rc-menu-brand:hover{transform:rotate(0deg) translateY(-2px)}
+.rc-home-3d .rc-section-ornament{position:relative}
+.rc-home-3d .rc-section-ornament::after{content:"";display:block;width:44px;height:3px;margin-top:10px;border-radius:99px;background:linear-gradient(90deg,#b18b57,rgba(177,139,87,0))}
+@media(max-width:767px){
+ .rc-home-3d .rc-hero-frame,.rc-home-3d .rc-hero-scene:hover .rc-hero-frame{transform:none;box-shadow:0 12px 28px rgba(17,41,33,.12)}
+ .rc-home-3d .rc-hero-scene::before{inset:7% 0 0 5%;transform:rotate(1deg)}
+ .rc-home-3d .rc-hero-glass,.rc-home-3d .rc-hero-scene:hover .rc-hero-glass{transform:none}
+ .rc-home-3d .rc-hero-decor{top:12px;right:12px;font-size:9px}
+ .rc-home-3d .rc-photo-depth:hover,.rc-home-3d .rc-photo-depth:nth-child(even):hover,.rc-home-3d .rc-depth-tile:hover{transform:none}
+}
+@media(hover:none){
+ .rc-home-3d .rc-photo-depth:hover,.rc-home-3d .rc-photo-depth:nth-child(even):hover,.rc-home-3d .rc-depth-tile:hover,.rc-home-3d .rc-depth-link:hover{transform:none}
+}
+@media(prefers-reduced-motion:reduce){
+ .rc-home-3d *, .rc-home-3d *::before, .rc-home-3d *::after{transition:none!important;animation:none!important}
+ .rc-home-3d .rc-hero-frame,.rc-home-3d .rc-hero-scene:hover .rc-hero-frame,.rc-home-3d .rc-hero-glass,.rc-home-3d .rc-hero-scene:hover .rc-hero-glass,.rc-home-3d .rc-depth-tile:hover,.rc-home-3d .rc-photo-depth:hover,.rc-home-3d .rc-photo-depth:nth-child(even):hover,.rc-home-3d .rc-depth-link:hover{transform:none!important}
+}
