@@ -18,7 +18,7 @@ type ScheduleEvent = {id:string;booking_id:string;event_name?:string|null;event_
 type Props = {token:string;bookings:Booking[];payments:Payment[];costs:Cost[];events:ScheduleEvent[];onChanged:()=>Promise<void>};
 const types = [['freelancer','ফ্রিল্যান্সার'],['editing','এডিটিং'],['travel','যাতায়াত'],['album','অ্যালবাম'],['equipment','সরঞ্জাম'],['office','অফিস'],['other','অন্যান্য']];
 
-export default function BookingFinanceManager({token,bookings=[],payments=[],costs=[],onChanged}:Props) {
+export default function BookingFinanceManager({token,bookings=[],payments=[],costs=[],events=[],onChanged}:Props) {
   const [general,setGeneral]=useState<GeneralCost[]>([]); const [notes,setNotes]=useState<Note[]>([]);
   const [followups,setFollowups]=useState<Followup[]>([]); const [auditLogs,setAuditLogs]=useState<AuditLog[]>([]);
   const [followupForm,setFollowupForm]=useState({id:'',booking_id:'',due_on:today(),note:''});
