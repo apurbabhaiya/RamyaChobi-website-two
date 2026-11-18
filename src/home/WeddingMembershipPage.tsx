@@ -1,125 +1,66 @@
 import React, { useState } from 'react';
-import { ArrowRight, BadgePercent, Camera, Check, Copy, CreditCard, Share2, Sparkles } from 'lucide-react';
+import { ArrowRight, BadgePercent, Camera, Check, Copy, CreditCard, Share2, Sparkles, Smartphone, ShieldCheck } from 'lucide-react';
 import ClientPageShell, { clientFocus } from './ClientPageShell';
+import { supabase } from '../services/supabase';
 
-type MembershipPackage = {
-  name: string;
-  regular: number;
-  discount: number;
-  member: number;
-};
-
+const db = supabase as any;
+type MembershipPackage = { name: string; regular: number; discount: number; member: number };
 const packages: MembershipPackage[] = [
   { name: 'Hindu Groom', regular: 36000, discount: 1800, member: 34200 },
   { name: 'Hindu Bride', regular: 28000, discount: 1400, member: 26600 },
   { name: 'Muslim Groom', regular: 20000, discount: 1000, member: 19000 },
   { name: 'Muslim Bride', regular: 16000, discount: 800, member: 15200 },
 ];
-
 const money = (amount: number) => '৳' + amount.toLocaleString('en-US');
 const publicUrl = 'https://ramyachobi-website-two.vercel.app/wedding-membership';
+const BKASH_NUMBER = '01776044951';
 
 function PackageCard({ item }: { item: MembershipPackage }) {
-  return (
-    <article className="relative flex h-full flex-col overflow-hidden rounded-3xl border border-[#d9c69b] bg-white shadow-[0_12px_32px_rgba(25,62,50,.08)]">
-      <div className="h-1.5 bg-gradient-to-r from-[#193e32] via-[#b18b57] to-[#193e32]" />
-      <div className="flex flex-1 flex-col p-5 sm:p-6">
-        <div className="flex items-center justify-between gap-2">
-          <span className="rounded-full bg-[#f5f0e4] px-3 py-1.5 text-xs font-bold tracking-wide text-[#6d512e]">WEDDING PACKAGE</span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-[#e8efe8] px-3 py-1.5 text-xs font-extrabold text-[#193e32]"><BadgePercent size={15}/> 5% OFF</span>
-        </div>
-        <h2 className="mt-5 font-serif text-2xl font-bold text-[#193e32]">{item.name}</h2>
-        <div className="mt-5 rounded-2xl bg-[#f8f6ef] p-4">
-          <p className="text-xs font-semibold uppercase tracking-[.12em] text-stone-500">Regular Price</p>
-          <p className="mt-1 text-xl font-semibold text-stone-400 line-through decoration-2">{money(item.regular)}</p>
-          <div className="mt-3 flex items-center justify-between gap-3 border-t border-dashed border-stone-300 pt-3">
-            <span className="text-sm font-medium text-stone-600">5% Membership Discount</span>
-            <span className="font-bold text-emerald-800">−{money(item.discount)}</span>
-          </div>
-        </div>
-        <div className="mt-4 rounded-2xl bg-[#193e32] p-5 text-white shadow-[0_8px_18px_rgba(25,62,50,.18)]">
-          <p className="text-xs font-bold uppercase tracking-[.16em] text-[#e9d9ad]">Member Price</p>
-          <p className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">{money(item.member)}</p>
-          <p className="mt-2 flex items-center gap-2 text-xs text-emerald-50"><Check size={15}/> You save {money(item.discount)}</p>
-        </div>
-        <a href="/booking" className={'mt-5 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#b18b57] px-4 py-3 text-sm font-bold text-[#193e32] transition hover:bg-[#c7a66f] '+clientFocus}>
-          Booking / Enquiry <ArrowRight size={17}/>
-        </a>
-      </div>
-    </article>
-  );
+  return <article className="relative flex h-full flex-col overflow-hidden rounded-3xl border border-[#d9c69b] bg-white shadow-[0_12px_32px_rgba(25,62,50,.08)]">
+    <div className="h-1.5 bg-gradient-to-r from-[#193e32] via-[#b18b57] to-[#193e32]" />
+    <div className="flex flex-1 flex-col p-5 sm:p-6">
+      <div className="flex items-center justify-between gap-2"><span className="rounded-full bg-[#f5f0e4] px-3 py-1.5 text-xs font-bold tracking-wide text-[#6d512e]">WEDDING PACKAGE</span><span className="inline-flex items-center gap-1 rounded-full bg-[#e8efe8] px-3 py-1.5 text-xs font-extrabold text-[#193e32]"><BadgePercent size={15}/> 5% OFF</span></div>
+      <h2 className="mt-5 font-serif text-2xl font-bold text-[#193e32]">{item.name}</h2>
+      <div className="mt-5 rounded-2xl bg-[#f8f6ef] p-4"><p className="text-xs font-semibold uppercase tracking-[.12em] text-stone-500">Regular Price</p><p className="mt-1 text-xl font-semibold text-stone-400 line-through decoration-2">{money(item.regular)}</p><div className="mt-3 flex items-center justify-between gap-3 border-t border-dashed border-stone-300 pt-3"><span className="text-sm font-medium text-stone-600">5% Membership Discount</span><span className="font-bold text-emerald-800">−{money(item.discount)}</span></div></div>
+      <div className="mt-4 rounded-2xl bg-[#193e32] p-5 text-white shadow-[0_8px_18px_rgba(25,62,50,.18)]"><p className="text-xs font-bold uppercase tracking-[.16em] text-[#e9d9ad]">Member Price</p><p className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">{money(item.member)}</p><p className="mt-2 flex items-center gap-2 text-xs text-emerald-50"><Check size={15}/> You save {money(item.discount)}</p></div>
+      <a href="#membership-payment" className={'mt-5 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#b18b57] px-4 py-3 text-sm font-bold text-[#193e32] transition hover:bg-[#c7a66f] '+clientFocus} onClick={()=>window.dispatchEvent(new CustomEvent('membership:select-package',{detail:item.name}))}>Get Membership <ArrowRight size={17}/></a>
+    </div>
+  </article>;
+}
+
+function MembershipPaymentForm() {
+  const [name,setName]=useState(''), [phone,setPhone]=useState(''), [selectedPackage,setSelectedPackage]=useState(''), [transactionId,setTransactionId]=useState('');
+  const [busy,setBusy]=useState(false), [error,setError]=useState(''), [result,setResult]=useState<{reference_code:string;status:string;amount:number}|null>(null), [copyState,setCopyState]=useState(false);
+  React.useEffect(()=>{const handler=(event:Event)=>{const value=(event as CustomEvent<string>).detail;if(packages.some(p=>p.name===value))setSelectedPackage(value)};window.addEventListener('membership:select-package',handler);return()=>window.removeEventListener('membership:select-package',handler)},[]);
+  async function copyNumber(){try{await navigator.clipboard.writeText(BKASH_NUMBER);setCopyState(true);window.setTimeout(()=>setCopyState(false),2200)}catch{setError('নম্বর কপি করা যায়নি। নিজে লিখে নিন: '+BKASH_NUMBER)}}
+  async function submit(e:React.FormEvent){e.preventDefault();setError('');if(name.trim().length<2||phone.trim().length<7||transactionId.trim().length<6){setError('নাম, সঠিক মোবাইল নম্বর ও Transaction ID দিন।');return}setBusy(true);try{const {data,error}=await db.rpc('submit_wedding_membership_payment',{p_client_name:name.trim(),p_phone:phone.trim(),p_selected_package:selectedPackage||null,p_transaction_id:transactionId.trim()});if(error)throw error;setResult(data);setTransactionId('')}catch(err:any){setError(err?.message||'পেমেন্টের তথ্য জমা হয়নি। আবার চেষ্টা করুন।')}finally{setBusy(false)}}
+  return <section id="membership-payment" className="scroll-mt-24 mt-10 rounded-3xl border border-[#d9c69b] bg-white p-5 shadow-sm sm:p-8">
+    <div className="flex items-center gap-3"><span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#193e32] text-[#e9d9ad]"><CreditCard size={24}/></span><div><p className="text-xs font-bold uppercase tracking-[.15em] text-[#8a6740]">Secure manual payment</p><h2 className="font-serif text-2xl font-bold text-[#193e32] sm:text-3xl">Pay ৳99 Membership Fee</h2></div></div>
+    {result ? <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5"><div className="flex items-center gap-2 font-bold text-amber-900"><ShieldCheck/> Payment details submitted</div><p className="mt-3 text-sm text-stone-700">Your submission is waiting for admin verification. Your membership is not active yet.</p><p className="mt-3 text-sm">Submission reference</p><p className="text-2xl font-black tracking-wide text-[#193e32]">{result.reference_code}</p><p className="mt-2 text-sm">Amount: <b>{money(result.amount)}</b> · Status: <b>Pending verification</b></p><button type="button" onClick={()=>{setResult(null);setName('');setPhone('');setSelectedPackage('');setTransactionId('')}} className="mt-4 rounded-xl bg-[#193e32] px-4 py-3 text-sm font-bold text-white">Submit another payment</button></div> : <>
+      <div className="mt-6 rounded-2xl bg-[#e2136e] p-5 text-white"><div className="flex items-center gap-2 text-sm font-bold"><Smartphone size={18}/> bKash · Send Money</div><p className="mt-2 text-xs text-white/80">Send exactly ৳99 to this number</p><div className="mt-2 flex flex-wrap items-center justify-between gap-3"><p className="text-3xl font-black tracking-wider">{BKASH_NUMBER}</p><button type="button" onClick={copyNumber} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-bold text-[#a80c50]"><Copy size={16}/>{copyState?'Copied':'Copy Number'}</button></div><p className="mt-3 text-xs text-white/90">Open bKash App → Send Money → enter the number → ৳99 → confirm → collect your Transaction ID.</p></div>
+      <form onSubmit={submit} className="mt-6 grid gap-4 sm:grid-cols-2">
+        <label className="text-sm font-semibold text-stone-700">Your full name *<input required minLength={2} maxLength={100} autoComplete="name" value={name} onChange={e=>setName(e.target.value)} className="mt-1.5 w-full rounded-xl border border-stone-300 px-3 py-3 font-normal outline-none focus:border-emerald-700" placeholder="Enter your name"/></label>
+        <label className="text-sm font-semibold text-stone-700">Mobile number *<input required type="tel" autoComplete="tel" value={phone} onChange={e=>setPhone(e.target.value)} className="mt-1.5 w-full rounded-xl border border-stone-300 px-3 py-3 font-normal outline-none focus:border-emerald-700" placeholder="01XXXXXXXXX"/></label>
+        <label className="text-sm font-semibold text-stone-700 sm:col-span-2">Wedding package (optional)<select value={selectedPackage} onChange={e=>setSelectedPackage(e.target.value)} className="mt-1.5 w-full rounded-xl border border-stone-300 bg-white px-3 py-3 font-normal"><option value="">Select a package or decide later</option>{packages.map(p=><option key={p.name} value={p.name}>{p.name} · Member price {money(p.member)}</option>)}</select></label>
+        <label className="text-sm font-semibold text-stone-700 sm:col-span-2">bKash Transaction ID (TrxID) *<input required minLength={6} maxLength={30} value={transactionId} onChange={e=>setTransactionId(e.target.value.replace(/\s/g,''))} className="mt-1.5 w-full rounded-xl border border-stone-300 px-3 py-3 font-normal uppercase outline-none focus:border-emerald-700" placeholder="Enter the Transaction ID"/></label>
+        {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700 sm:col-span-2">{error}</p>}
+        <button disabled={busy} className="min-h-12 rounded-xl bg-[#193e32] px-5 py-3 font-bold text-white disabled:opacity-60 sm:col-span-2">{busy?'Submitting…':'Submit Payment Details'}</button>
+      </form>
+      <p className="mt-4 text-xs leading-6 text-stone-500">Submitting the Transaction ID does not activate the membership. RamyaChobi will verify the payment manually. Never share your bKash PIN or OTP.</p>
+    </>}
+  </section>;
 }
 
 export default function WeddingMembershipPage() {
-  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
-
-  async function copyPageLink() {
-    const link = typeof window !== 'undefined' ? window.location.href : publicUrl;
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(link);
-      } else {
-        const input = document.createElement('textarea');
-        input.value = link;
-        input.style.position = 'fixed';
-        input.style.opacity = '0';
-        document.body.appendChild(input);
-        input.select();
-        const copied = document.execCommand('copy');
-        input.remove();
-        if (!copied) throw new Error('Copy not supported');
-      }
-      setCopyState('copied');
-    } catch {
-      setCopyState('error');
-    }
-  }
-
-  const shareUrl = typeof window !== 'undefined' ? window.location.href : publicUrl;
-  const facebookShare = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(shareUrl);
-
-  return (
-    <ClientPageShell current="membership">
-      <main id="page-content" className="mx-auto max-w-6xl px-4 py-6 sm:px-6 md:py-10">
-        <section className="relative overflow-hidden rounded-[2rem] bg-[#193e32] px-5 py-8 text-white shadow-[0_18px_45px_rgba(25,62,50,.16)] sm:px-9 sm:py-11">
-          <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full border-[26px] border-[#e9d9ad]/10"/>
-          <div aria-hidden="true" className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 rounded-full border-[20px] border-white/5"/>
-          <div className="relative">
-            <p className="inline-flex items-center gap-2 rounded-full border border-[#e9d9ad]/40 bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.17em] text-[#f0dfb6]"><Sparkles size={14}/> RAMYACHOBI MEMBERSHIP</p>
-            <h1 className="mt-5 max-w-3xl font-serif text-3xl font-bold leading-tight sm:text-5xl">Wedding Package – 5% Membership Discount</h1>
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-emerald-50 sm:text-base">Choose your wedding package and see the special member price. Compare the regular price, 5% discount and final member price clearly.</p>
-            <div className="mt-7 flex flex-col gap-3 rounded-2xl border border-[#e9d9ad]/35 bg-white/10 p-4 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
-              <div className="flex items-center gap-3">
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#e9d9ad] text-[#193e32]"><CreditCard size={25}/></span>
-                <div><p className="text-xs font-semibold uppercase tracking-[.12em] text-emerald-100">Membership Card Fee</p><p className="mt-0.5 text-2xl font-extrabold text-white">৳99</p></div>
-              </div>
-              <div className="text-sm leading-6 text-emerald-50 sm:max-w-xs sm:text-right">Membership price is shown separately for each wedding package below.</div>
-            </div>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <a href="#membership-packages" className={'inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#e9d9ad] px-5 py-3 text-sm font-extrabold text-[#193e32] '+clientFocus}>View 4 Packages <ArrowRight size={17}/></a>
-              <a href={facebookShare} target="_blank" rel="noopener noreferrer" className={'inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/35 bg-white/10 px-5 py-3 text-sm font-bold text-white hover:bg-white/15 '+clientFocus}><Share2 size={17}/> Share on Facebook</a>
-              <button type="button" onClick={copyPageLink} className={'inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/35 bg-white/10 px-5 py-3 text-sm font-bold text-white hover:bg-white/15 '+clientFocus}><Copy size={16}/>{copyState==='copied'?'Link Copied':copyState==='error'?'Copy unavailable':'Copy Link'}</button>
-            </div>
-          </div>
-        </section>
-
-        <section id="membership-packages" className="scroll-mt-24 pt-9 sm:pt-12">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div><p className="text-[11px] font-bold uppercase tracking-[.18em] text-[#8a6740]">MEMBERSHIP OFFERS</p><h2 className="mt-2 font-serif text-3xl font-bold text-[#193e32] sm:text-4xl">Choose Your Wedding Package</h2><p className="mt-2 text-sm leading-7 text-stone-600">All four packages include a 5% membership discount.</p></div>
-            <span className="inline-flex items-center gap-2 rounded-full bg-[#e8efe8] px-4 py-2 text-sm font-extrabold text-[#193e32]"><BadgePercent size={18}/> Save 5%</span>
-          </div>
-          <div className="mt-6 grid items-stretch gap-4 sm:grid-cols-2">
-            {packages.map(item=><PackageCard key={item.name} item={item}/>)}
-          </div>
-        </section>
-
-        <section className="mt-9 grid gap-4 md:grid-cols-[1fr_auto] md:items-center rounded-3xl border border-[#d9c69b] bg-white p-5 sm:p-7">
-          <div><h2 className="font-serif text-2xl font-bold text-[#193e32]">Ready to plan your wedding?</h2><p className="mt-2 text-sm leading-7 text-stone-600">Contact RamyaChobi to discuss your package, event date and booking details.</p></div>
-          <a href="/booking" className={'inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#193e32] px-5 py-3 text-sm font-bold text-white '+clientFocus}>Booking / Enquiry <ArrowRight size={17}/></a>
-        </section>
-
-        <p className="mt-6 text-center text-xs leading-6 text-stone-500">Prices are displayed in Bangladeshi Taka (BDT). Membership Card Fee: ৳99. Please confirm package details and availability with RamyaChobi before booking.</p>
-      </main>
-    </ClientPageShell>
-  );
+  const [copyState,setCopyState]=useState<'idle'|'copied'|'error'>('idle');
+  async function copyPageLink(){const link=typeof window!=='undefined'?window.location.href:publicUrl;try{if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(link);else{const input=document.createElement('textarea');input.value=link;input.style.position='fixed';input.style.opacity='0';document.body.appendChild(input);input.select();const copied=document.execCommand('copy');input.remove();if(!copied)throw new Error('Copy not supported')}setCopyState('copied')}catch{setCopyState('error')}}
+  const shareUrl=typeof window!=='undefined'?window.location.href:publicUrl;
+  const facebookShare='https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(shareUrl);
+  return <ClientPageShell current="membership"><main id="page-content" className="mx-auto max-w-6xl px-4 py-6 sm:px-6 md:py-10">
+    <section className="relative overflow-hidden rounded-[2rem] bg-[#193e32] px-5 py-8 text-white shadow-[0_18px_45px_rgba(25,62,50,.16)] sm:px-9 sm:py-11"><div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full border-[26px] border-[#e9d9ad]/10"/><div aria-hidden="true" className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 rounded-full border-[20px] border-white/5"/><div className="relative"><p className="inline-flex items-center gap-2 rounded-full border border-[#e9d9ad]/40 bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.17em] text-[#f0dfb6]"><Sparkles size={14}/> RAMYACHOBI MEMBERSHIP</p><h1 className="mt-5 max-w-3xl font-serif text-3xl font-bold leading-tight sm:text-5xl">Wedding Package – 5% Membership Discount</h1><p className="mt-4 max-w-2xl text-sm leading-7 text-emerald-50 sm:text-base">Choose your wedding package and see the special member price. Compare the regular price, 5% discount and final member price clearly.</p><div className="mt-7 flex flex-col gap-3 rounded-2xl border border-[#e9d9ad]/35 bg-white/10 p-4 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:p-5"><div className="flex items-center gap-3"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#e9d9ad] text-[#193e32]"><CreditCard size={25}/></span><div><p className="text-xs font-semibold uppercase tracking-[.12em] text-emerald-100">Membership Card Fee</p><p className="mt-0.5 text-2xl font-extrabold text-white">৳99</p></div></div><div className="text-sm leading-6 text-emerald-50 sm:max-w-xs sm:text-right">Membership price is shown separately for each wedding package below.</div></div><div className="mt-6 flex flex-wrap gap-3"><a href="#membership-packages" className={'inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#e9d9ad] px-5 py-3 text-sm font-extrabold text-[#193e32] '+clientFocus}>View 4 Packages <ArrowRight size={17}/></a><a href="#membership-payment" className={'inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/35 bg-white/10 px-5 py-3 text-sm font-bold text-white '+clientFocus}>Pay ৳99 Membership Fee <CreditCard size={17}/></a><a href={facebookShare} target="_blank" rel="noopener noreferrer" className={'inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/35 bg-white/10 px-5 py-3 text-sm font-bold text-white hover:bg-white/15 '+clientFocus}><Share2 size={17}/> Share on Facebook</a><button type="button" onClick={copyPageLink} className={'inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/35 bg-white/10 px-5 py-3 text-sm font-bold text-white hover:bg-white/15 '+clientFocus}><Copy size={16}/>{copyState==='copied'?'Link Copied':copyState==='error'?'Copy unavailable':'Copy Link'}</button></div></div></section>
+    <section id="membership-packages" className="scroll-mt-24 pt-9 sm:pt-12"><div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-[11px] font-bold uppercase tracking-[.18em] text-[#8a6740]">MEMBERSHIP OFFERS</p><h2 className="mt-2 font-serif text-3xl font-bold text-[#193e32] sm:text-4xl">Choose Your Wedding Package</h2><p className="mt-2 text-sm leading-7 text-stone-600">All four packages include a 5% membership discount.</p></div><span className="inline-flex items-center gap-2 rounded-full bg-[#e8efe8] px-4 py-2 text-sm font-extrabold text-[#193e32]"><BadgePercent size={18}/> Save 5%</span></div><div className="mt-6 grid items-stretch gap-4 sm:grid-cols-2">{packages.map(item=><PackageCard key={item.name} item={item}/>)}</div></section>
+    <MembershipPaymentForm/>
+    <section className="mt-9 grid gap-4 rounded-3xl border border-[#d9c69b] bg-white p-5 md:grid-cols-[1fr_auto] md:items-center sm:p-7"><div><h2 className="font-serif text-2xl font-bold text-[#193e32]">Ready to plan your wedding?</h2><p className="mt-2 text-sm leading-7 text-stone-600">Contact RamyaChobi to discuss your package, event date and booking details.</p></div><a href="/booking" className={'inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#193e32] px-5 py-3 text-sm font-bold text-white '+clientFocus}>Booking / Enquiry <ArrowRight size={17}/></a></section>
+    <p className="mt-6 text-center text-xs leading-6 text-stone-500">Prices are displayed in Bangladeshi Taka (BDT). Membership Card Fee: ৳99. Please confirm package details and availability with RamyaChobi before booking.</p>
+  </main></ClientPageShell>;
 }
