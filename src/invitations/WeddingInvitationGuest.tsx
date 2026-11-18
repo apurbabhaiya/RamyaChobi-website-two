@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { CalendarDays, HeartHandshake, MapPin, Share2 } from 'lucide-react';
 import WeddingInviteCard from './WeddingInviteCard';
 import InvitationExperience from './InvitationExperience';
+import { InvitationBrandPromotion } from './InvitationPromotion';
 import { decodeInvite, downloadWeddingCalendar, readableDate, readableTime, type WeddingInvite } from './invitationModel';
 import './invitation.css';
 
@@ -44,7 +45,8 @@ export default function WeddingInvitationGuest() {
   }
   const venueQuery = [currentInvite.venue,currentInvite.address].filter(Boolean).join(', ');
   return <main className="min-h-dvh overflow-hidden bg-[radial-gradient(ellipse_at_top,#fff9ef,#e6dbc6_70%,#c4af8c)] px-3 py-7 text-stone-900 sm:py-12">
-    <div className="mx-auto max-w-xl text-center">
+    <div className="mx-auto grid max-w-[1240px] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_290px] xl:gap-9">
+    <div className="mx-auto w-full max-w-xl text-center">
       <div className="text-xs font-bold uppercase tracking-[.25em] text-amber-900">A little love. A beautiful moment.</div>
       <h1 className="mt-3 font-serif text-3xl font-semibold sm:text-4xl">You're Invited</h1>
       <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-stone-700">Tap the invitation to unfold a special message from {currentInvite.bride} and {currentInvite.groom}.</p>
@@ -63,6 +65,11 @@ export default function WeddingInvitationGuest() {
         <div className="mt-6 border-t border-amber-200 pt-4"><p className="font-serif text-xs tracking-[.2em] text-stone-500">WITH LOVE FROM</p><a href="/" className="mt-1 block font-serif text-lg font-bold text-[#193c32]">RAMYACHOBI</a></div>
       </div>
       <div className="mt-6"><InvitationExperience invite={currentInvite}/></div>
+    </div>
+    <aside className="mx-auto w-full max-w-xl lg:sticky lg:top-8" aria-label="About the invitation creator">
+      <InvitationBrandPromotion compact />
+      <p className="mt-3 px-3 text-center text-xs leading-5 text-amber-950/75">Enjoyed this wedding invitation? Discover RamyaChobi photography and film packages.</p>
+    </aside>
     </div>
   </main>;
 }
