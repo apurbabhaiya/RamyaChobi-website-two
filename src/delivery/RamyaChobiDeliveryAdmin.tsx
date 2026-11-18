@@ -938,6 +938,7 @@ export default function RamyaChobiDeliveryAdmin() {
           <button type="button" aria-current={adminSection === 'chat-replies' ? 'page' : undefined} onClick={() => setAdminSection('chat-replies')} className={`flex min-h-11 items-center rounded-xl px-4 py-2.5 text-sm font-semibold ${adminSection === 'chat-replies' ? 'bg-emerald-800 text-white' : 'bg-emerald-50 text-emerald-900'}`}>চ্যাটের উত্তর</button>
           <button type="button" aria-current={adminSection === 'discussion-requests' ? 'page' : undefined} onClick={() => setAdminSection('discussion-requests')} className={`flex min-h-11 items-center rounded-xl px-4 py-2.5 text-sm font-semibold ${adminSection === 'discussion-requests' ? 'bg-emerald-800 text-white' : 'bg-emerald-50 text-emerald-900'}`}>আলোচনার অনুরোধ</button>
           <a href="/photo-selection" className="rounded-xl bg-stone-100 px-4 py-2.5 text-sm font-semibold text-stone-700 hover:bg-amber-100">Photo Selection</a>
+          <a href="/booking/admin?section=invitations" className="flex min-h-11 items-center rounded-xl bg-amber-100 px-4 py-2.5 text-sm font-bold text-amber-950">✦ Wedding Invitations</a>
         </div>
       </nav>
 
