@@ -35,3 +35,12 @@
 @media(max-width:550px){.invitation-scene{overflow:hidden;padding:10px 6px 12px}.invitation-envelope,.invitation-card,.invitation-cover{min-height:580px}.invitation-card{padding:22px 23px 17px}.invitation-envelope.is-open .invitation-cover{transform:rotateY(-175deg);pointer-events:none}}
 @media(prefers-reduced-motion:reduce){.invitation-cover{transition:none}.invitation-envelope.is-open .invitation-cover{transform:none;opacity:0;pointer-events:none}}
 @media print{.invitation-cover,.invitation-toggle{display:none!important}.invitation-card{box-shadow:none;outline:none}.invitation-envelope{filter:none}.invitation-scene{padding:0}}
+
+/* Lightweight celebration sections: no image CDN, animation library or paid API. */
+.invitation-glass-card{position:relative;border-radius:25px;border:1px solid #e4cfae;background:#fffcf5cf;box-shadow:0 9px 30px #4d392413;backdrop-filter:blur(5px)}
+.invitation-wish-lanterns{position:fixed;inset:0;z-index:100;pointer-events:none;overflow:hidden}
+.invitation-wish-lanterns span{position:absolute;bottom:5%;left:50%;font-size:64px;color:#dcab58;text-shadow:0 0 22px #fff4bc;opacity:0;animation:invitation-rise 2.5s ease-out forwards}
+.invitation-wish-lanterns span:nth-child(2){left:40%;font-size:48px}
+.invitation-wish-lanterns span:nth-child(3){left:60%;font-size:40px}
+@keyframes invitation-rise{0%{transform:translate3d(0,0,0) scale(.75);opacity:0}25%{opacity:1}90%{opacity:.5}100%{transform:translate3d(0,-90vh,0) scale(1.3);opacity:0}}
+@media (prefers-reduced-motion:reduce){.invitation-wish-lanterns{display:none!important}.invitation-glass-card{backdrop-filter:none}}
