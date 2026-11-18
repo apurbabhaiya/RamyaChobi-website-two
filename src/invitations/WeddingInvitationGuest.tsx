@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CalendarDays, HeartHandshake, MapPin, Share2 } from 'lucide-react';
 import WeddingInviteCard from './WeddingInviteCard';
+import InvitationExperience from './InvitationExperience';
 import { decodeInvite, readableDate, readableTime, type WeddingInvite } from './invitationModel';
 import './invitation.css';
 
@@ -48,6 +49,7 @@ export default function WeddingInvitationGuest() {
       <h1 className="mt-3 font-serif text-3xl font-semibold sm:text-4xl">You're Invited</h1>
       <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-stone-700">Tap the invitation to unfold a special message from {currentInvite.bride} and {currentInvite.groom}.</p>
       <WeddingInviteCard invite={invite}/>
+      <a href="#countdown" className="mb-4 inline-flex min-h-11 items-center rounded-full border border-amber-400 bg-white/70 px-5 py-3 text-sm font-bold text-amber-950">Save the Date ↓</a>
       <div className="mt-2 rounded-3xl border border-white/80 bg-white/75 p-5 shadow-sm backdrop-blur-sm">
         <p className="font-serif text-xl font-semibold">{currentInvite.occasion}</p>
         <p className="mt-2 text-sm"><CalendarDays size={16} className="mr-2 inline text-amber-800"/>{readableDate(currentInvite.date)} · {readableTime(currentInvite.time)}</p>
@@ -59,6 +61,7 @@ export default function WeddingInvitationGuest() {
         </div>
         <div className="mt-6 border-t border-amber-200 pt-4"><p className="font-serif text-xs tracking-[.2em] text-stone-500">WITH LOVE FROM</p><a href="/" className="mt-1 block font-serif text-lg font-bold text-[#193c32]">RAMYACHOBI</a></div>
       </div>
+      <div className="mt-6"><InvitationExperience invite={currentInvite}/></div>
     </div>
   </main>;
 }
