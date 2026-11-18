@@ -23,6 +23,7 @@ import FinanceCalendar from "./FinanceCalendar";
 import BookingFinanceManager from "./BookingFinanceManager";
 import WebsiteTeamManager from "./WebsiteTeamManager";
 import SpinResultAdmin from "../components/SpinResultAdmin";
+import WeddingMembershipAdmin from "./WeddingMembershipAdmin";
 import { jsPDF } from "jspdf";
 import { supabase } from "../services/supabase";
 
@@ -1269,6 +1270,7 @@ function AdminPanel() {
   const [showTeam,setShowTeam] = useState(new URLSearchParams(window.location.search).get('section')==='team');
   const [showSpin,setShowSpin] = useState(new URLSearchParams(window.location.search).get('section')==='spin');
   const [showFinance,setShowFinance] = useState(new URLSearchParams(window.location.search).get('section')==='finance');
+  const [showMembership,setShowMembership] = useState(new URLSearchParams(window.location.search).get('section')==='membership');
   const [showTrash, setShowTrash] = useState(false);
   const [pendingTrash, setPendingTrash] = useState<Booking | null>(null);
   const [pendingPermanentDelete, setPendingPermanentDelete] = useState<Booking | null>(null);
@@ -1587,12 +1589,13 @@ function AdminPanel() {
           {([
             {id:'clients',title:'ক্লায়েন্ট ও হিসাব',hint:'বুকিং, জমা ও খরচ',active:!showCustomSettings&&!showDiscussions&&!showChatbot&&!showTeam&&!showSpin&&!showFinance},
             {id:'finance',title:'হিসাব ও বুকিং কন্ট্রোল',hint:'মাস/বছর, বাকি ও খরচ',active:showFinance},
+            {id:'membership',title:'Membership Payment',hint:'bKash TrxID যাচাই ও কার্ড অনুমোদন',active:showMembership},
             {id:'settings',title:'বুকিং ও ডিসকাউন্ট',hint:'রেট, ছাড় ও পেমেন্ট',active:showCustomSettings},
             {id:'discussions',title:'আলোচনার অনুরোধ',hint:'গ্রাহকের সঙ্গে যোগাযোগ',active:showDiscussions},
             {id:'chat',title:'চ্যাটের উত্তর',hint:'অটো-রিপ্লাই নিয়ন্ত্রণ',active:showChatbot},
             {id:'team',title:'ওয়েবসাইট টিম',hint:'সদস্য, ছবি ও পোর্টফোলিও',active:showTeam},
             {id:'spin',title:'Spin & Win',hint:'পয়েন্ট, বুকিং ও পুরস্কার',active:showSpin},
-          ]).map(item=><button key={item.id} type="button" aria-pressed={item.active} onClick={()=>{setShowCustomSettings(item.id==='settings');setShowDiscussions(item.id==='discussions');setShowChatbot(item.id==='chat');setShowTeam(item.id==='team');setShowSpin(item.id==='spin');setShowFinance(item.id==='finance');const url=new URL(window.location.href);url.searchParams.set('section',item.id);window.history.replaceState(null,'',url);}} className={'min-h-20 rounded-2xl border p-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 '+(item.active?'border-emerald-800 bg-[#193e32] text-white':'border-stone-200 bg-white text-stone-900')}><strong className="block text-sm">{item.title}</strong><small className={'mt-1 block text-xs '+(item.active?'text-emerald-100':'text-stone-500')}>{item.hint}</small></button>)}
+          ]).map(item=><button key={item.id} type="button" aria-pressed={item.active} onClick={()=>{setShowCustomSettings(item.id==='settings');setShowDiscussions(item.id==='discussions');setShowChatbot(item.id==='chat');setShowTeam(item.id==='team');setShowSpin(item.id==='spin');setShowFinance(item.id==='finance');setShowMembership(item.id==='membership');const url=new URL(window.location.href);url.searchParams.set('section',item.id);window.history.replaceState(null,'',url);}} className={'min-h-20 rounded-2xl border p-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 '+(item.active?'border-emerald-800 bg-[#193e32] text-white':'border-stone-200 bg-white text-stone-900')}><strong className="block text-sm">{item.title}</strong><small className={'mt-1 block text-xs '+(item.active?'text-emerald-100':'text-stone-500')}>{item.hint}</small></button>)}
         </nav>
         <details className="mt-3 rounded-xl border border-stone-200 bg-white px-3"><summary className="min-h-11 cursor-pointer py-3 text-sm font-bold">আরও টুলস · CSV, রিফ্রেশ ও সাইন আউট</summary><div className="flex flex-wrap gap-2 pb-3"><button type="button" onClick={exportCsv} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-stone-300 px-3 text-sm font-bold"><Download className="h-4 w-4"/>CSV ডাউনলোড</button><button type="button" onClick={()=>void load()} disabled={loading} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-stone-300 px-3 text-sm font-bold disabled:opacity-50"><RefreshCw className={'h-4 w-4 '+(loading?'animate-spin':'')}/>রিফ্রেশ</button><button type="button" onClick={signOut} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-stone-900 px-3 text-sm font-bold text-white"><LogOut className="h-4 w-4"/>সাইন আউট</button></div></details>
       </div>
@@ -1603,7 +1606,8 @@ function AdminPanel() {
       {showTeam && <WebsiteTeamManager adminToken={token}/>}
       {showSpin && <SpinResultAdmin adminToken={token}/>}
       {showFinance && <BookingFinanceManager token={token} bookings={bookings} payments={payments} costs={costs} events={events} onChanged={load}/>}
-      <div hidden={showCustomSettings||showDiscussions||showChatbot||showTeam||showSpin||showFinance}>
+      {showMembership && <div className="px-4 py-5"><WeddingMembershipAdmin token={token}/></div>}
+      <div hidden={showCustomSettings||showDiscussions||showChatbot||showTeam||showSpin||showFinance||showMembership}>
       {!showTrash && <BookingPaymentInbox token={token} bookings={activePaymentBookings} onChanged={load} />}
       <div className="mx-auto grid max-w-[1500px] gap-4 px-4 py-5 xl:grid-cols-[1.1fr_1fr]">
         <section className="min-w-0 rounded-3xl bg-white shadow-sm">
