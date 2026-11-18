@@ -6,6 +6,7 @@ import PublicDeliveryAlbums from "./delivery/PublicDeliveryAlbums";
 import RamyaChobiDelivery from "./delivery/RamyaChobiDelivery";
 import RamyaChobiDeliveryAdmin from "./delivery/RamyaChobiDeliveryAdmin";
 import RamyaChobiHome from "./home/RamyaChobiHome";
+import RamyaChobiEntry from "./home/RamyaChobiEntry";
 import RamyaChobiPackages from "./home/RamyaChobiPackages";
 import RamyaChobiAbout from "./home/RamyaChobiAbout";
 import ClientAccessPage from "./home/ClientAccessPage";
@@ -64,7 +65,7 @@ export default function RouterApp() {
   const page = (() => {
   if (path === "/facebook-login") return <FacebookAccessGate callback />;
 
-  if (path === "/") return (<RamyaChobiHome />);
+  if (path === "/") return <RamyaChobiEntry />;
   if (path === "/spin-result") return <SpinResultSubmission />;
   if (path === "/about") return (<RamyaChobiAbout />);
   if (path === "/packages") return (<RamyaChobiPackages />);
