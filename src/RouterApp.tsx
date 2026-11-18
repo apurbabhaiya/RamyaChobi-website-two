@@ -16,7 +16,7 @@ import SpinResultSubmission from "./home/SpinResultSubmission";
 import WeddingInvitationGuest from "./invitations/WeddingInvitationGuest";
 import WeddingInvitationLanding from "./invitations/WeddingInvitationLanding";
 
-const withChat = (page: React.ReactNode) => /^(\/booking\/admin|\/delivery-admin|\/studio)(\/|$)/.test(window.location.pathname) ? <>{page}</> : <>{page}<RamyaChatWidget /></>;
+const withChat = (page: React.ReactNode) => /^(\/booking\/admin|\/delivery-admin|\/studio|\/invitation)(\/|$)/.test(window.location.pathname) ? <>{page}</> : <>{page}<RamyaChatWidget /></>;
 
 export default function RouterApp() {
   const path = window.location.pathname;
