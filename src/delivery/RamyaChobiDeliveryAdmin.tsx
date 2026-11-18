@@ -1,0 +1,1478 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  BadgeCheck,
+  Archive,
+  Plus,
+  CalendarClock,
+  CheckCircle2,
+  Clipboard,
+  Clock3,
+  Copy,
+  ExternalLink,
+  FileCheck2,
+  Images,
+  KeyRound,
+  Link2,
+  Loader2,
+  LockKeyhole,
+  LogOut,
+  RefreshCw,
+  Settings2,
+  ShieldCheck,
+  WalletCards,
+  Users,
+  XCircle,
+} from 'lucide-react';
+import {
+  DeliveryAdminDashboard,
+  DeliveryAdminPortal,
+  activateFinalDelivery,
+  createDeliveryPortalFromBooking,
+  createManualDeliveryClient,
+  deliveryAdminLogin,
+  deliveryAdminLogout,
+  getDeliveryAdminDashboard,
+  reviewDeliveryPayment,
+  updateDeliverySettings,
+  updateDeliveryPaymentMethods,
+  setDeliveryAdvancePaid,
+  getDeliveryPaymentProofUrl,
+  DeliveryAdminFile,
+  listDeliveryFiles,
+  upsertDeliveryFile,
+  deleteDeliveryFile,
+  deleteClientDelivery,
+  syncDeliveryFolder,
+  validateAndSaveDeliveryFile,
+  updateDeliveryPortal,
+  listDeliveryPayments,
+  addDeliveryPayment,
+  updateDeliveryPayment,
+  deleteDeliveryPayment,
+  restoreDeliveryAccess,
+  setDeliveryPermissions,
+  setDeliveryPublished,
+  setPublicDeliveryListing,
+  setPublicDeliveryDownload,
+  setDeliveryDocumentPermission,
+  DeliveryPaymentLedger,
+  BookingPaymentRequest,
+  listBookingPaymentRequests,
+  reviewBookingPaymentRequest as saveBookingPaymentReview,
+} from '../services/deliveryPortalService';
+import { manualClientPayload, type ManualClientDraft } from './manualClient';
+import { directoryDate, filterClientDirectory, type DirectoryDateField, type DirectorySort } from './clientDirectory';
+import DeliveryDownloadSettings from './DeliveryDownloadSettings';
+import DeliveryPaymentShortcut from './DeliveryPaymentShortcut';
+import PortfolioManager from '../components/PortfolioManager';
+import WebsiteTeamManager from '../booking/WebsiteTeamManager';
+import ChatbotAdmin from '../booking/ChatbotAdmin';
+import { BookingDiscussionAdmin, CustomPackageAdmin } from '../booking/CustomPackages';
+import SpinResultAdmin from '../components/SpinResultAdmin';
+import DriveDeliveryPickerModal from '../components/DriveDeliveryPickerModal';
+import DriveConnectionCard from '../components/DriveConnectionCard';
+
+const ADMIN_TOKEN_KEY = 'ramya_booking_admin_token_v1';
+
+function isGoogleDriveFolderLink(value: string) {
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'https:' && url.hostname === 'drive.google.com' && /\/folders\/[A-Za-z0-9_-]+/i.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
+function money(value: number | string | null | undefined) {
+  return new Intl.NumberFormat('en-BD', {
+    style: 'currency',
+    currency: 'BDT',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(Number(value || 0));
+}
+
+function fmt(value?: string | null) {
+  if (!value) return 'Not set';
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+function toDateTimeLocal(value?: string | null) {
+  if (!value) return '';
+  const d = new Date(value);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function loadStoredToken() {
+  try {
+    return localStorage.getItem(ADMIN_TOKEN_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function saveStoredToken(token: string) {
+  try {
+    if (token) localStorage.setItem(ADMIN_TOKEN_KEY, token);
+    else localStorage.removeItem(ADMIN_TOKEN_KEY);
+  } catch {}
+}
+
+function StatusPill({ value }: { value: string }) {
+  const positive = ['FULLY_PAID', 'ACTIVE', 'TEMPORARILY_ACTIVE', 'FINAL_DELIVERED', 'VERIFIED', 'ENABLED'].includes(value);
+  const warning = ['SUBMITTED', 'READY', 'PREVIEW', 'PENDING'].includes(value);
+  return (
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ${
+      positive
+        ? 'bg-emerald-100 text-emerald-800'
+        : warning
+          ? 'bg-amber-100 text-amber-800'
+          : 'bg-stone-200 text-stone-700'
+    }`}>
+      {value.replaceAll('_', ' ')}
+    </span>
+  );
+}
+
+export default function RamyaChobiDeliveryAdmin() {
+  const [adminSection, setAdminSection] = useState('delivery');
+  const [portalSections, setPortalSections] = useState<Record<string, string>>({});
+  const [paymentFocusId, setPaymentFocusId] = useState('');
+  useEffect(() => {
+    if (!paymentFocusId) return;
+    const ledger = document.getElementById(`payment-ledger-${paymentFocusId}`);
+    ledger?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    ledger?.focus({ preventScroll: true });
+    setPaymentFocusId('');
+  }, [paymentFocusId, portalSections]);
+  const [deleteTarget, setDeleteTarget] = useState<DeliveryAdminPortal | null>(null);
+  const [deleteName, setDeleteName] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  async function confirmDeleteClient() {
+    if (!deleteTarget || deleting || deleteName !== deleteTarget.client_name) return;
+    setDeleting(true); setDeleteError('');
+    try {
+      await deleteClientDelivery({ token, portalId: deleteTarget.id, clientName: deleteName });
+      setDeleteTarget(null); setDeleteName(''); setSelectedPortalId('');
+      setNotice('Client delivery removed. Previous client link is disabled. Drive files and payment history are preserved.');
+      await load();
+    } catch (e: any) { setDeleteError(e?.message || 'Could not delete client delivery. Try again.'); }
+    finally { setDeleting(false); }
+  }
+  const [token, setToken] = useState('');
+  const [accessCode, setAccessCode] = useState('');
+  const [dashboard, setDashboard] = useState<DeliveryAdminDashboard | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [selectedBooking, setSelectedBooking] = useState('');
+  const [newBkash, setNewBkash] = useState('01776044951');
+  const [newRetention, setNewRetention] = useState('');
+  const [editingPortal, setEditingPortal] = useState<DeliveryAdminPortal | null>(null);
+  const [settingsBkash, setSettingsBkash] = useState('');
+  const [settingsNagad, setSettingsNagad] = useState('');
+  const [settingsDbbl, setSettingsDbbl] = useState('');
+  const [settingsRocket, setSettingsRocket] = useState('');
+  const [settingsRetention, setSettingsRetention] = useState('');
+  const [paymentProofUrl, setPaymentProofUrl] = useState('');
+  const [proofLoadingId, setProofLoadingId] = useState('');
+  const [bookingPaymentRequests, setBookingPaymentRequests] = useState<BookingPaymentRequest[]>([]);
+  const [bookingPaymentLoading, setBookingPaymentLoading] = useState(false);
+  const [bookingPaymentBusyId, setBookingPaymentBusyId] = useState('');
+  const [bookingPaymentMessage, setBookingPaymentMessage] = useState('');
+  const [filesByPortal, setFilesByPortal] = useState<Record<string, DeliveryAdminFile[]>>({});
+  const [fileDrafts, setFileDrafts] = useState<Record<string, { url: string; fileName: string; title: string; type: 'PHOTO' | 'VIDEO' | 'DOCUMENT' | 'FOLDER'; sortOrder: string }>>({});
+  const [fileMetaByPortal, setFileMetaByPortal] = useState<Record<string, { name?: string; mimeType?: string; size?: string | null }>>({});
+  const [fileErrorByPortal, setFileErrorByPortal] = useState<Record<string, string>>({});
+  const [rawZipLinksByPortal, setRawZipLinksByPortal] = useState<Record<string, { photos: string; videos: string }>>({});
+  const [rawFolderLinksByPortal, setRawFolderLinksByPortal] = useState<Record<string, { photos: string; videos: string }>>({});
+  const [drivePickerPortalId, setDrivePickerPortalId] = useState('');
+  const [ledgerByPortal, setLedgerByPortal] = useState<Record<string, DeliveryPaymentLedger[]>>({});
+  const [portalSearch, setPortalSearch] = useState('');
+  const [portalDate, setPortalDate] = useState('');
+  const [portalDateField, setPortalDateField] = useState<DirectoryDateField>('event_date');
+  const [portalSort, setPortalSort] = useState<DirectorySort>('name');
+  const [selectedPortalId, setSelectedPortalId] = useState('');
+  const emptyManualClient: ManualClientDraft = { client_name: '', phone: '', event_date: '', event_name: '', total: '', paid: '0', delivered: false };
+  const [showManualClient, setShowManualClient] = useState(false);
+  const [manualDraft, setManualDraft] = useState<ManualClientDraft>(emptyManualClient);
+  const [manualRequestId, setManualRequestId] = useState(() => crypto.randomUUID());
+  const [manualBusy, setManualBusy] = useState(false);
+  const [manualError, setManualError] = useState('');
+  const [manualSuccess, setManualSuccess] = useState('');
+  const manualDue = Math.max(0, Number(manualDraft.total || 0) - Number(manualDraft.paid || 0));
+  function changeManualDraft(patch: Partial<ManualClientDraft>) {
+    setManualDraft(current => {
+      const next = { ...current, ...patch };
+      if (Number(next.paid) < Number(next.total)) next.delivered = false;
+      return next;
+    });
+  }
+  async function saveManualClient(event: React.FormEvent) {
+    event.preventDefault();
+    if (manualBusy) return;
+    setManualError('');
+    let payload: ReturnType<typeof manualClientPayload>;
+    try { payload = manualClientPayload(manualDraft, manualRequestId); }
+    catch (error: any) { setManualError(error.message); return; }
+    setManualBusy(true);
+    try {
+      const saved = await createManualDeliveryClient(token, payload);
+      setPortalSearch(''); setPortalDate(''); setPortalDateField('event_date');
+      setSelectedPortalId(saved.id); setPortalEdit({}); setEditingPortal(null);
+      await load();
+      setManualSuccess(`${saved.client_name} যোগ হয়েছে। বাকি: ${money(saved.remaining_due)}। ছবি/ভিডিও যোগ করে ডেলিভারি নিয়ন্ত্রণ থেকে Publish করুন।`);
+      setShowManualClient(false); setManualDraft(emptyManualClient); setManualRequestId(crypto.randomUUID());
+      window.requestAnimationFrame(() => document.getElementById(`portal-${saved.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    } catch (error: any) { setManualError(error?.message || 'কাস্টমার যোগ হয়নি। আবার চেষ্টা করুন।'); }
+    finally { setManualBusy(false); }
+  }
+
+  const [portalEdit, setPortalEdit] = useState<Record<string, any>>({});
+  const [ledgerDrafts, setLedgerDrafts] = useState<Record<string, { date: string; method: DeliveryPaymentLedger['payment_method']; amount: string; transactionId: string; note: string; status: DeliveryPaymentLedger['status'] }>>({});
+
+  async function load(useToken?: string) {
+    const activeToken = useToken || token;
+    if (!activeToken) {
+      setReady(true);
+      return;
+    }
+    setLoading(true);
+    setNotice('');
+    try {
+      const data = await getDeliveryAdminDashboard(activeToken);
+      setDashboard(data);
+      const fileEntries = await Promise.all((data.portals || []).map(async (portal: DeliveryAdminPortal) => {
+        try { return [portal.id, await listDeliveryFiles({ token: activeToken, portalId: portal.id })] as const; }
+        catch { return [portal.id, []] as const; }
+      }));
+      setFilesByPortal(Object.fromEntries(fileEntries));
+      const ledgerEntries = await Promise.all((data.portals || []).map(async (portal: DeliveryAdminPortal) => {
+        try { return [portal.id, await listDeliveryPayments({ token: activeToken, portalId: portal.id })] as const; }
+        catch { return [portal.id, []] as const; }
+      }));
+      setLedgerByPortal(Object.fromEntries(ledgerEntries));
+    } catch (error: any) {
+      const message = error?.message || 'Could not load delivery admin data.';
+      setNotice(message);
+      if (/session expired|invalid admin/i.test(message)) {
+        saveStoredToken('');
+        setToken('');
+        setDashboard(null);
+      }
+    } finally {
+      setLoading(false);
+      setReady(true);
+    }
+  }
+
+  useEffect(() => {
+    const stored = loadStoredToken();
+    if (stored) {
+      setToken(stored);
+      void load(stored);
+    } else {
+      setReady(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    const timer = window.setInterval(() => {
+      if (!document.hidden) void load(token);
+    }, 30000);
+    return () => window.clearInterval(timer);
+  }, [token]);
+
+  const portals = dashboard?.portals || [];
+  const submissions = dashboard?.submissions || [];
+  const bookings = dashboard?.bookings || [];
+  const availableBookings = bookings.filter((b) => !b.has_portal);
+  const pendingRequests = submissions.filter((s) => s.status === 'SUBMITTED');
+
+  useEffect(() => {
+    let live = true;
+    if (!token || !bookings.length) {
+      setBookingPaymentRequests([]);
+      setBookingPaymentLoading(false);
+      return () => { live = false; };
+    }
+    setBookingPaymentLoading(true);
+    setBookingPaymentMessage('');
+    void Promise.all(bookings.map(async (booking) => {
+      const requests = await listBookingPaymentRequests(token, booking.id);
+      return requests.map((request) => ({
+        ...request,
+        client_name: booking.client_name,
+        reference_no: booking.reference_no,
+        event_name: booking.event_name,
+      }));
+    })).then((groups) => {
+      if (live) setBookingPaymentRequests(groups.flat());
+    }).catch((error: any) => {
+      if (live) setBookingPaymentMessage(error?.message || 'Booking payments could not be loaded.');
+    }).finally(() => {
+      if (live) setBookingPaymentLoading(false);
+    });
+    return () => { live = false; };
+  }, [token, bookings]);
+
+  const pendingBookingPayments = bookingPaymentRequests.filter((request) => request.status === 'pending');
+  const directoryPortals = portals.map(portal => ({
+    ...portal,
+    event_date: portal.event_date || bookings.find(booking => booking.id === portal.booking_id)?.event_date,
+  }));
+  const filteredPortals = filterClientDirectory(directoryPortals, {
+    query: portalSearch, date: portalDate, dateField: portalDateField, sort: portalSort,
+  });
+  const activePortal = filteredPortals.find(portal => portal.id === selectedPortalId) || filteredPortals[0];
+  const dateLabels: Record<DirectoryDateField, string> = {
+    event_date: 'অনুষ্ঠানের তারিখ', final_delivery_at: 'ডেলিভারির তারিখ', created_at: 'যোগ করার তারিখ',
+  };
+  function selectDirectoryClient(id: string) {
+    if (id !== selectedPortalId) {
+      setPortalEdit({});
+      setEditingPortal(null);
+    }
+    setSelectedPortalId(id);
+    window.requestAnimationFrame(() => {
+      const detail = document.getElementById(`portal-${id}`);
+      detail?.focus({ preventScroll: true });
+      if (window.innerWidth < 1024) detail?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
+  const counts = useMemo(() => {
+    return {
+      portals: portals.length,
+      paymentPending: portals.filter((p) => p.payment_status !== 'FULLY_PAID').length,
+      finalActive: portals.filter((p) => p.delivery_status === 'FINAL_DELIVERED' && p.gallery_status === 'ACTIVE').length,
+      locked: portals.filter((p) => p.gallery_status === 'LOCKED').length,
+      requests: pendingRequests.length,
+    };
+  }, [portals, pendingRequests]);
+
+  const paymentReviewCount = counts.requests + pendingBookingPayments.length;
+
+  async function reviewBookingPayment(requestId: string, approve: boolean) {
+    setBookingPaymentBusyId(requestId);
+    setBookingPaymentMessage('');
+    try {
+      await saveBookingPaymentReview(token, requestId, approve);
+      setBookingPaymentMessage(approve ? 'Booking payment verified and added to the client ledger.' : 'Booking payment request rejected.');
+      await load();
+    } catch (error: any) {
+      setBookingPaymentMessage(error?.message || 'Could not update the booking payment.');
+    } finally {
+      setBookingPaymentBusyId('');
+    }
+  }
+
+  function startPortalEdit(portal: DeliveryAdminPortal) {
+    setSelectedPortalId(portal.id);
+    setPortalEdit({
+      clientName: portal.client_name || '',
+      clientPhone: portal.client_phone || '',
+      whatsappNumber: portal.whatsapp_number || portal.client_phone || '',
+      eventName: portal.event_name || '',
+      packagePrice: String(portal.package_price || ''),
+      advancePaid: String(portal.advance_paid || 0),
+      finalDeliveryAt: toDateTimeLocal(portal.final_delivery_at),
+      accessExpiryAt: toDateTimeLocal(portal.free_access_expires_at || portal.access_expires_at),
+      freeAccessDays: String(portal.free_access_days ?? 30),
+      gracePeriodDays: String(portal.grace_period_days ?? 0),
+      dailyLateFee: String(portal.daily_late_fee ?? 10),
+      lateFeeEnabled: portal.late_fee_enabled !== false,
+      lateFeeWaived: portal.late_fee_waived === true,
+      lateFeeOverride: portal.late_fee_override == null ? '' : String(portal.late_fee_override),
+      clientMessage: portal.client_message || '',
+      clientNote: portal.client_note || '',
+      internalAdminNote: portal.internal_admin_note || '',
+      previewEnabled: portal.preview_enabled !== false,
+      photoDownloadPermission: portal.photo_download_permission === true,
+      videoDownloadPermission: portal.video_download_permission === true,
+      driveLinkAccessEnabled: portal.drive_link_access_enabled === true,
+      documentDownloadPermission: portal.document_download_permission === true,
+    });
+  }
+
+  function updatePortalEdit(patch: Record<string, unknown>) {
+    setPortalEdit((current) => ({ ...current, ...patch }));
+  }
+
+  async function savePortalEdit() {
+    if (!selectedPortalId) return;
+    setLoading(true); setNotice('');
+    try {
+      await updateDeliveryPortal({
+        token, portalId: selectedPortalId,
+        clientName: portalEdit.clientName || null,
+        clientPhone: portalEdit.clientPhone || null,
+        whatsappNumber: portalEdit.whatsappNumber || null,
+        eventName: portalEdit.eventName || null,
+        packagePrice: Number(portalEdit.packagePrice || 0),
+        finalDeliveryAt: portalEdit.finalDeliveryAt ? new Date(portalEdit.finalDeliveryAt).toISOString() : null,
+        accessExpiryAt: portalEdit.accessExpiryAt ? new Date(portalEdit.accessExpiryAt).toISOString() : null,
+        freeAccessDays: Number(portalEdit.freeAccessDays || 30),
+        gracePeriodDays: Number(portalEdit.gracePeriodDays || 0),
+        dailyLateFee: Number(portalEdit.dailyLateFee || 0),
+        lateFeeEnabled: Boolean(portalEdit.lateFeeEnabled),
+        lateFeeWaived: Boolean(portalEdit.lateFeeWaived),
+        lateFeeOverride: portalEdit.lateFeeOverride === '' ? null : Number(portalEdit.lateFeeOverride),
+        clientMessage: portalEdit.clientMessage || null,
+        clientNote: portalEdit.clientNote || null,
+        internalAdminNote: portalEdit.internalAdminNote || null,
+      });
+      await setDeliveryAdvancePaid({
+        token,
+        portalId: selectedPortalId,
+        advancePaid: Number(portalEdit.advancePaid || 0),
+      });
+      await setDeliveryPermissions({
+        token,
+        portalId: selectedPortalId,
+        previewEnabled: Boolean(portalEdit.previewEnabled),
+        photoDownloadPermission: Boolean(portalEdit.photoDownloadPermission),
+        videoDownloadPermission: Boolean(portalEdit.videoDownloadPermission),
+        driveLinkAccessEnabled: Boolean(portalEdit.driveLinkAccessEnabled),
+      });
+      await setDeliveryDocumentPermission({ token, portalId: selectedPortalId, allowed: Boolean(portalEdit.documentDownloadPermission) });
+      setNotice('Client portal details and permissions updated.');
+      await load();
+    } catch (error: any) { setNotice(error?.message || 'Could not update client portal.'); }
+    finally { setLoading(false); }
+  }
+
+  function ledgerDraft(portalId: string) {
+    return ledgerDrafts[portalId] || { date: new Date().toISOString().slice(0, 10), method: 'CASH' as const, amount: '', transactionId: '', note: '', status: 'VERIFIED' as const };
+  }
+
+  function updateLedgerDraft(portalId: string, patch: Partial<ReturnType<typeof ledgerDraft>>) {
+    setLedgerDrafts((current) => ({ ...current, [portalId]: { ...ledgerDraft(portalId), ...patch } }));
+  }
+
+  async function saveLedgerPayment(portalId: string) {
+    const draft = ledgerDraft(portalId);
+    if (!Number(draft.amount)) { setNotice('Enter a payment amount first.'); return; }
+    setLoading(true); setNotice('');
+    try {
+      await addDeliveryPayment({ token, portalId, paymentDate: draft.date, paymentMethod: draft.method, amount: Number(draft.amount), transactionId: draft.transactionId || null, note: draft.note || null, status: draft.status });
+      setNotice('Payment ledger entry added.');
+      await load();
+    } catch (error: any) { setNotice(error?.message || 'Could not add payment.'); }
+    finally { setLoading(false); }
+  }
+
+  async function setLedgerStatus(payment: DeliveryPaymentLedger, status: DeliveryPaymentLedger['status']) {
+    setLoading(true); setNotice('');
+    try {
+      await updateDeliveryPayment({ token, paymentId: payment.id, status });
+      setNotice(`Payment marked ${status.toLowerCase()}.`);
+      await load();
+    } catch (error: any) { setNotice(error?.message || 'Could not update payment.'); }
+    finally { setLoading(false); }
+  }
+
+  async function removeLedgerPayment(paymentId: string) {
+    if (!window.confirm('Delete this payment ledger entry?')) return;
+    setLoading(true); setNotice('');
+    try { await deleteDeliveryPayment({ token, paymentId }); setNotice('Payment entry deleted.'); await load(); }
+    catch (error: any) { setNotice(error?.message || 'Could not delete payment.'); }
+    finally { setLoading(false); }
+  }
+
+  async function restorePortal(portalId: string, waiveFee: boolean) {
+    setLoading(true); setNotice('');
+    try {
+      await restoreDeliveryAccess({ token, portalId, restoreDays: 30, waiveFee });
+      setNotice(waiveFee ? 'Late fee waived and access restored.' : 'Access restored after late fee review.');
+      await load();
+    } catch (error: any) { setNotice(error?.message || 'Could not restore access.'); }
+    finally { setLoading(false); }
+  }
+
+  function portalWhatsapp(phone?: string | null) {
+    const digits = String(phone || '').replace(/\D/g, '');
+    const normalized = digits.startsWith('880') ? digits : digits.startsWith('0') ? `88${digits}` : `880${digits}`;
+    const text = encodeURIComponent('আসসালামু আলাইকুম। আপনার RamyaChobi Final Delivery সম্পর্কে যোগাযোগ করছি। আপনার বাকি পেমেন্ট ও ফাইল ডাউনলোডের বিষয়ে বিস্তারিত জানাতে চাই।');
+    return `https://wa.me/${normalized}?text=${text}`;
+  }
+
+  async function signIn(e: React.FormEvent) {
+    e.preventDefault();
+    if (!accessCode.trim()) return;
+    setLoading(true);
+    setNotice('');
+    try {
+      const result = await deliveryAdminLogin(accessCode.trim());
+      saveStoredToken(result.token);
+      setToken(result.token);
+      setAccessCode('');
+      await load(result.token);
+    } catch (error: any) {
+      setNotice(error?.message || 'Invalid admin access code.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function signOut() {
+    try {
+      if (token) await deliveryAdminLogout(token);
+    } catch {}
+    saveStoredToken('');
+    setToken('');
+    setDashboard(null);
+    setNotice('');
+  }
+
+  async function createPortal() {
+    if (!selectedBooking) {
+      setNotice('Select a booking first.');
+      return;
+    }
+    setLoading(true);
+    setNotice('');
+    try {
+      const result = await createDeliveryPortalFromBooking({
+        token,
+        bookingId: selectedBooking,
+        bkashNumber: newBkash.trim() || null,
+        storageRetentionUntil: newRetention ? new Date(newRetention).toISOString() : null,
+      });
+      setNotice(`Delivery portal created for ${result.client_name}.`);
+      setSelectedBooking('');
+      setNewBkash('01776044951');
+      setNewRetention('');
+      await load();
+    } catch (error: any) {
+      setNotice(error?.message || 'Could not create delivery portal.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function viewPaymentProof(submissionId: string) {
+    setProofLoadingId(submissionId);
+    setNotice('');
+    try {
+      const url = await getDeliveryPaymentProofUrl(token, submissionId);
+      setPaymentProofUrl(url);
+    } catch (error: any) {
+      setNotice(error?.message || 'Could not open payment screenshot.');
+    } finally {
+      setProofLoadingId('');
+    }
+  }
+
+  async function review(submissionId: string, decision: 'VERIFY' | 'REJECT') {
+    setLoading(true);
+    setNotice('');
+    try {
+      await reviewDeliveryPayment({ token, submissionId, decision });
+      setNotice(decision === 'VERIFY' ? (submissions.find(s => s.id === submissionId)?.payment_type === 'RECOVERY' ? 'রিকভারি পেমেন্ট যাচাই হয়েছে। ফাইল নিশ্চিত করে ডাউনলোডের মেয়াদ আলাদাভাবে নবায়ন করুন।' : 'Payment verified.') : 'Payment rejected.');
+      await load();
+    } catch (error: any) {
+      setNotice(error?.message || 'Could not review payment.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function activate(portalId: string) {
+    setLoading(true);
+    setNotice('');
+    try {
+      await activateFinalDelivery({ token, portalId });
+      setNotice('Final Delivery activated. The 30-day complimentary access period has started.');
+      await load();
+    } catch (error: any) {
+      setNotice(error?.message || 'Could not activate Final Delivery.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function startEdit(portal: DeliveryAdminPortal) {
+    setEditingPortal(portal);
+    setSettingsBkash(portal.bkash_number || '01776044951');
+    setSettingsNagad(portal.nagad_number || '');
+    setSettingsDbbl(portal.dbbl_number || '');
+    setSettingsRocket(portal.rocket_number || '');
+    setSettingsRetention(toDateTimeLocal(portal.storage_retention_until));
+  }
+
+  async function saveSettings() {
+    if (!editingPortal) return;
+    setLoading(true);
+    setNotice('');
+    try {
+      await updateDeliverySettings({
+        token,
+        portalId: editingPortal.id,
+        bkashNumber: settingsBkash.trim() || null,
+        storageRetentionUntil: settingsRetention ? new Date(settingsRetention).toISOString() : null,
+      });
+      await updateDeliveryPaymentMethods({
+        token,
+        portalId: editingPortal.id,
+        bkashNumber: settingsBkash.trim(),
+        nagadNumber: settingsNagad.trim(),
+        dbblNumber: settingsDbbl.trim(),
+        rocketNumber: settingsRocket.trim(),
+      });
+      setNotice('Delivery settings and payment methods updated.');
+      setEditingPortal(null);
+      await load();
+    } catch (error: any) {
+      setNotice(error?.message || 'Could not update delivery settings.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function togglePortalPermission(portal: DeliveryAdminPortal, key: 'preview' | 'photo' | 'video' | 'drive') {
+    const next = {
+      previewEnabled: key === 'preview' ? portal.preview_enabled === false : portal.preview_enabled !== false,
+      photoDownloadPermission: key === 'photo' ? portal.photo_download_permission !== true : portal.photo_download_permission === true,
+      videoDownloadPermission: key === 'video' ? portal.video_download_permission !== true : portal.video_download_permission === true,
+      driveLinkAccessEnabled: key === 'drive' ? portal.drive_link_access_enabled !== true : portal.drive_link_access_enabled === true,
+    };
+    setLoading(true);
+    setNotice('');
+    try {
+      await setDeliveryPermissions({ token, portalId: portal.id, ...next });
+      setNotice('Delivery permissions updated.');
+      await load();
+    } catch (error: any) {
+      setNotice(error?.message || 'Could not update delivery permissions.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function copyLink(portal: DeliveryAdminPortal) {
+    const link = `${window.location.origin}/delivery/${portal.secure_token}`;
+    navigator.clipboard?.writeText(link);
+    setNotice('Private client link copied.');
+  }
+
+  async function changePublicDownload(portal: DeliveryAdminPortal) {
+    const enabled = !portal.public_download_enabled;
+    if (enabled && !window.confirm('ফুল পেমেন্ট ও সক্রিয় Final Delivery থাকলে প্রকাশ্য অ্যালবামের দর্শকরা আসল ছবি ডাউনলোড করতে পারবেন। অনুমতি দিতে চান?')) return;
+    setLoading(true);
+    try { await setPublicDeliveryDownload({token,portalId:portal.id,enabled}); await load(); setNotice(enabled ? 'ফুল পেমেন্ট সাপেক্ষে ডাউনলোডের অনুমতি দেওয়া হয়েছে।' : 'প্রকাশ্য অ্যালবামের ডাউনলোড বন্ধ করা হয়েছে।'); }
+    catch(error:any) {setNotice(error?.message || 'ডাউনলোডের অনুমতি পরিবর্তন করা যায়নি।');}
+    finally {setLoading(false);}
+  }
+
+  async function setPublicListing(portal: DeliveryAdminPortal) {
+    const visible = !portal.public_listed;
+    if (visible && !window.confirm('এই ক্লায়েন্টের নাম ও তারিখ /delivery তালিকায় সবার জন্য দেখানো হবে। তালিকার সারি খুললে ব্যক্তিগত ডেলিভারি পোর্টাল, পেমেন্ট ও অ্যাক্সেসের তথ্যও দেখা যাবে। সবার জন্য প্রকাশ করতে চান?')) return;
+    setLoading(true);
+    try { await setPublicDeliveryListing({token,portalId:portal.id,visible}); await load(); setNotice(visible ? 'অ্যালবাম প্রকাশ্য তালিকায় দেখানো হচ্ছে।' : 'অ্যালবাম প্রকাশ্য তালিকা থেকে লুকানো হয়েছে।'); }
+    catch(error:any) {setNotice(error?.message || 'অ্যালবামের দৃশ্যমানতা পরিবর্তন করা যায়নি।');}
+    finally {setLoading(false);}
+  }
+
+  async function setPublished(portal: DeliveryAdminPortal, published: boolean) {
+    setLoading(true); setNotice('');
+    try {
+      await setDeliveryPublished({ token, portalId: portal.id, published });
+      setNotice(published ? 'Delivery published. The client link is active.' : 'Delivery saved as a private draft. The client link is disabled.');
+      await load();
+    } catch (error: any) { setNotice(error?.message || 'Could not update publish status.'); }
+    finally { setLoading(false); }
+  }
+
+  function previewClientPage(portal: DeliveryAdminPortal) {
+    window.open(`/delivery/${portal.secure_token}?preview=admin`, '_blank', 'noopener,noreferrer');
+  }
+
+  function pickedDriveItem(portalId: string, item: { id: string; name: string; mimeType: string }) {
+    const folder = item.mimeType === 'application/vnd.google-apps.folder';
+    const type = folder ? 'FOLDER' : item.mimeType.startsWith('image/') ? 'PHOTO' : item.mimeType.startsWith('video/') ? 'VIDEO' : 'DOCUMENT';
+    const url = folder ? `https://drive.google.com/drive/folders/${item.id}` : `https://drive.google.com/file/d/${item.id}/view`;
+    setDrivePickerPortalId('');
+    updateFileDraft(portalId, { url, title: item.name, fileName: item.name, type });
+    void addFinalDeliveryFile(portalId, folder ? { url, name: item.name } : undefined);
+  }
+  function openDeliveryDrivePicker(portalId: string) { setDrivePickerPortalId(portalId); }
+
+  function updateFileDraft(portalId: string, patch: Partial<{ url: string; fileName: string; title: string; type: 'PHOTO' | 'VIDEO' | 'DOCUMENT' | 'FOLDER'; sortOrder: string }>) {
+    setFileDrafts((current) => ({
+      ...current,
+      [portalId]: { url: current[portalId]?.url || '', fileName: current[portalId]?.fileName || '', title: current[portalId]?.title || '', type: current[portalId]?.type || 'PHOTO', sortOrder: current[portalId]?.sortOrder || '', ...patch },
+    }));
+  }
+
+  async function addFinalDeliveryFile(portalId: string, pickedFolder?: { url: string; name: string }) {
+    const currentDraft = fileDrafts[portalId] || { url: '', fileName: '', title: '', type: 'PHOTO' as const, sortOrder: '' };
+    const draft = pickedFolder ? { ...currentDraft, url: pickedFolder.url, title: pickedFolder.name, type: 'FOLDER' as const } : currentDraft;
+    if (!draft.url.trim()) { setNotice('Paste a Google Drive link or choose a folder with Browse Drive.'); return; }
+    setLoading(true); setNotice('Validating private Google Drive link...');
+    setFileErrorByPortal((current) => ({ ...current, [portalId]: '' }));
+    try {
+      if (draft.type === 'FOLDER') {
+        const verified = await validateAndSaveDeliveryFile({ adminToken: token, portalId, sourceUrl: draft.url.trim(), fileType: 'FOLDER', persist: false });
+        const result = await syncDeliveryFolder({ adminToken: token, portalId, folderUrl: draft.url.trim() });
+        setFileMetaByPortal((current) => ({ ...current, [portalId]: { name: verified.metadata.name, mimeType: verified.metadata.mimeType, size: verified.metadata.size || null } }));
+        setNotice(`Link verified: ${verified.metadata.name}. ${result.imported} file(s) imported from the private folder.`);
+      } else {
+        const verified = await validateAndSaveDeliveryFile({
+          adminToken: token,
+          portalId,
+          sourceUrl: draft.url.trim(),
+          fileType: draft.type,
+          fileName: draft.fileName.trim() || null,
+          title: draft.title.trim() || null,
+          sortOrder: Number(draft.sortOrder || 0),
+          persist: true,
+        });
+        setFileMetaByPortal((current) => ({ ...current, [portalId]: { name: verified.metadata.name, mimeType: verified.metadata.mimeType, size: verified.metadata.size || null } }));
+        setNotice(`Link verified successfully: ${verified.metadata.name} (${verified.metadata.mimeType}). Private file connected.`);
+      }
+      const files = await listDeliveryFiles({ token, portalId });
+      setFilesByPortal((current) => ({ ...current, [portalId]: files }));
+      setFileDrafts((current) => ({ ...current, [portalId]: { url: '', fileName: '', title: '', type: draft.type, sortOrder: '' } }));
+    } catch (error: any) {
+      const message = error?.message || 'Google Drive link validation failed.';
+      setFileErrorByPortal((current) => ({ ...current, [portalId]: message }));
+      setNotice(message);
+    }
+    finally { setLoading(false); }
+  }
+
+  async function addRawZipFromDrive(portalId: string, media: 'photos' | 'videos') {
+    const sourceUrl = (rawZipLinksByPortal[portalId]?.[media] || '').trim();
+    const title = media === 'photos' ? 'RAW Photos ZIP' : 'RAW Videos ZIP';
+    if (!sourceUrl) {
+      setFileErrorByPortal((current) => ({ ...current, [portalId]: 'Google Drive ZIP ফাইলের লিংক দিন। / Paste a Google Drive ZIP file link.' }));
+      return;
+    }
+    setLoading(true);
+    setFileErrorByPortal((current) => ({ ...current, [portalId]: '' }));
+    setNotice('Google Drive ZIP link যাচাই করা হচ্ছে…');
+    try {
+      const verified = await validateAndSaveDeliveryFile({
+        adminToken: token,
+        portalId,
+        sourceUrl,
+        fileType: 'DOCUMENT',
+        title,
+        sortOrder: (filesByPortal[portalId] || []).length,
+        rawZip: true,
+        persist: true,
+      });
+      if (!verified.saved) throw new Error('RAW ZIP link was verified but not saved.');
+      const files = await listDeliveryFiles({ token, portalId });
+      setFilesByPortal((current) => ({ ...current, [portalId]: files }));
+      setRawZipLinksByPortal((current) => ({ ...current, [portalId]: { photos: current[portalId]?.photos || '', videos: current[portalId]?.videos || '', [media]: '' } }));
+      setNotice(`${title} যুক্ত হয়েছে: ${verified.metadata.name}. ক্লায়েন্ট RAW ${media === 'photos' ? 'Photos' : 'Videos'} বিভাগ থেকে ডাউনলোড করতে পারবে।`);
+    } catch (error: any) {
+      const message = error?.message || 'RAW ZIP Google Drive link যুক্ত করা যায়নি।';
+      setFileErrorByPortal((current) => ({ ...current, [portalId]: message }));
+      setNotice(message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function importRawDeliveryFolder(portalId: string, media: 'photos' | 'videos') {
+    const folderUrl = (rawFolderLinksByPortal[portalId]?.[media] || '').trim();
+    const title = media === 'photos' ? 'RAW Photos' : 'RAW Videos';
+    if (!folderUrl || !isGoogleDriveFolderLink(folderUrl)) {
+      setFileErrorByPortal((current) => ({ ...current, [portalId]: 'একটি Google Drive folder link দিন। / Paste a valid Google Drive folder link.' }));
+      return;
+    }
+    setLoading(true);
+    setFileErrorByPortal((current) => ({ ...current, [portalId]: '' }));
+    setNotice(`${title} folder থেকে ফাইল আনা হচ্ছে…`);
+    try {
+      const result = await syncDeliveryFolder({
+        adminToken: token,
+        portalId,
+        folderUrl,
+        fileType: media === 'photos' ? 'PHOTO' : 'VIDEO',
+        raw: true,
+      });
+      const files = await listDeliveryFiles({ token, portalId });
+      setFilesByPortal((current) => ({ ...current, [portalId]: files }));
+      setRawFolderLinksByPortal((current) => ({ ...current, [portalId]: { photos: current[portalId]?.photos || '', videos: current[portalId]?.videos || '', [media]: '' } }));
+      setNotice(`${title} folder যুক্ত হয়েছে: ${result.imported}টি ফাইল যোগ হয়েছে${result.skipped ? `, ${result.skipped}টি বাদ` : ''}. ক্লায়েন্ট RAW ${media === 'photos' ? 'Photos' : 'Videos'} preview করতে পারবে।`);
+    } catch (error: any) {
+      const message = error?.message || 'RAW folder import করা যায়নি।';
+      setFileErrorByPortal((current) => ({ ...current, [portalId]: message }));
+      setNotice(message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function removeFinalDeliveryFile(portalId: string, fileId: string) {
+    setLoading(true); setNotice('');
+    try {
+      await deleteDeliveryFile({ token, fileId });
+      setFilesByPortal((current) => ({ ...current, [portalId]: (current[portalId] || []).filter((file) => file.id !== fileId) }));
+      setNotice('Final Delivery file removed.');
+    } catch (error: any) { setNotice(error?.message || 'Could not remove Final Delivery file.'); }
+    finally { setLoading(false); }
+  }
+
+
+  async function editFinalDeliveryFile(portalId: string, file: DeliveryAdminFile) {
+    const nextUrl = window.prompt('Google Drive file or folder link', file.source_url);
+    if (!nextUrl?.trim()) return;
+    const nextTitle = window.prompt('Display title (optional)', file.title || '') ?? (file.title || '');
+    setLoading(true); setNotice('Validating replacement link...');
+    try {
+      if (file.file_type === 'FOLDER') {
+        await validateAndSaveDeliveryFile({ adminToken: token, portalId, sourceUrl: nextUrl.trim(), fileType: 'FOLDER', persist: false });
+        await upsertDeliveryFile({
+          token, portalId, fileId: file.id, sourceUrl: nextUrl.trim(), fileType: file.file_type,
+          title: nextTitle.trim() || null, fileName: file.file_name || null, mimeType: file.mime_type || null,
+          sortOrder: file.sort_order || 0, isVisible: file.is_visible,
+        });
+      } else {
+        await validateAndSaveDeliveryFile({
+          adminToken: token, portalId, fileId: file.id, sourceUrl: nextUrl.trim(), fileType: file.file_type,
+          title: nextTitle.trim() || null, fileName: file.file_name || null, sortOrder: file.sort_order || 0,
+          isVisible: file.is_visible, persist: true,
+        });
+      }
+      const files = await listDeliveryFiles({ token, portalId });
+      setFilesByPortal((current) => ({ ...current, [portalId]: files }));
+      setNotice('Replacement link verified and saved.');
+    } catch (error: any) { setNotice(error?.message || 'Replacement Google Drive link failed validation.'); }
+    finally { setLoading(false); }
+  }
+
+  async function toggleFinalDeliveryFile(portalId: string, file: DeliveryAdminFile) {
+    setLoading(true); setNotice('');
+    try {
+      await upsertDeliveryFile({
+        token, portalId, fileId: file.id, sourceUrl: file.source_url, fileType: file.file_type,
+        title: file.title || null, fileName: file.file_name || null, mimeType: file.mime_type || null,
+        sortOrder: file.sort_order || 0, isVisible: !file.is_visible,
+      });
+      const files = await listDeliveryFiles({ token, portalId });
+      setFilesByPortal((current) => ({ ...current, [portalId]: files }));
+      setNotice(file.is_visible ? 'File hidden from client.' : 'File shown to client.');
+    } catch (error: any) { setNotice(error?.message || 'Could not change file visibility.'); }
+    finally { setLoading(false); }
+  }
+
+  if (!ready) {
+    return (
+      <div className="min-h-screen bg-stone-950 text-white flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-amber-300" />
+      </div>
+    );
+  }
+
+  if (!token) {
+    return (
+      <main className="min-h-screen bg-stone-950 px-5 py-12 text-white flex items-center justify-center">
+        <form onSubmit={signIn} className="w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-7 shadow-2xl backdrop-blur">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-300 text-stone-950">
+            <KeyRound className="h-6 w-6" />
+          </div>
+          <div className="mt-5 text-sm font-semibold uppercase tracking-[0.2em] text-amber-300">RamyaChobi</div>
+          <h1 className="mt-2 text-3xl font-semibold">Delivery Admin</h1>
+          <p className="mt-2 text-sm leading-6 text-white/55">Use the same admin access code as the booking admin system.</p>
+          <input
+            type="password"
+            value={accessCode}
+            onChange={(e) => setAccessCode(e.target.value)}
+            placeholder="Admin access code"
+            className="mt-6 w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 outline-none placeholder:text-white/30 focus:border-amber-300"
+          />
+          <button disabled={loading} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-300 px-4 py-3 font-bold text-stone-950 disabled:opacity-50">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+            Sign in
+          </button>
+          {notice && <div className="mt-4 rounded-xl bg-red-500/10 p-3 text-sm text-red-200">{notice}</div>}
+        </form>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-[#f5f2eb] text-stone-900">
+      <header className="bg-stone-950 px-5 py-6 text-white">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-300">RamyaChobi</div>
+            <h1 className="mt-1 text-2xl font-semibold">RamyaChobi Admin Panel</h1>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3.5 py-2 text-sm font-semibold">
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+            </button>
+            <button onClick={signOut} className="inline-flex items-center gap-2 rounded-xl bg-white px-3.5 py-2 text-sm font-semibold text-stone-950">
+              <LogOut className="h-4 w-4" /> Sign out
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <nav aria-label="Admin navigation" className="border-b border-stone-200 bg-white px-5 py-3">
+        <div className="mx-auto flex max-w-7xl flex-wrap gap-2">
+          {(['dashboard', 'delivery', 'payments', 'portfolio', 'team', 'spin-results', 'settings'] as const).map((section) => (
+            <button key={section} type="button" aria-current={adminSection === section ? 'page' : undefined}
+              onClick={() => setAdminSection(section)}
+              className={`min-h-12 rounded-2xl px-4 py-3 text-sm sm:text-base font-bold capitalize focus-visible:outline-2 focus-visible:outline-amber-600 ${adminSection === section ? 'bg-stone-950 text-white shadow-sm' : 'bg-stone-100 text-stone-700 hover:bg-amber-100'}`}>
+              {section === 'team' ? 'Website Team' : section === 'spin-results' ? 'Spin Results' : section}{section === 'payments' && paymentReviewCount > 0 ? ` (${paymentReviewCount})` : ''}
+            </button>
+          ))}
+          <a href="/booking/admin" className="flex min-h-11 items-center rounded-xl bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white">ক্লায়েন্ট ও হিসাব</a>
+          <button type="button" aria-current={adminSection === 'booking-discounts' ? 'page' : undefined} onClick={() => setAdminSection('booking-discounts')} className={`flex min-h-11 items-center rounded-xl px-4 py-2.5 text-sm font-semibold ${adminSection === 'booking-discounts' ? 'bg-emerald-800 text-white' : 'bg-emerald-50 text-emerald-900'}`}>বুকিং / ডিসকাউন্ট</button>
+          <button type="button" aria-current={adminSection === 'chat-replies' ? 'page' : undefined} onClick={() => setAdminSection('chat-replies')} className={`flex min-h-11 items-center rounded-xl px-4 py-2.5 text-sm font-semibold ${adminSection === 'chat-replies' ? 'bg-emerald-800 text-white' : 'bg-emerald-50 text-emerald-900'}`}>চ্যাটের উত্তর</button>
+          <button type="button" aria-current={adminSection === 'discussion-requests' ? 'page' : undefined} onClick={() => setAdminSection('discussion-requests')} className={`flex min-h-11 items-center rounded-xl px-4 py-2.5 text-sm font-semibold ${adminSection === 'discussion-requests' ? 'bg-emerald-800 text-white' : 'bg-emerald-50 text-emerald-900'}`}>আলোচনার অনুরোধ</button>
+          <a href="/photo-selection" className="rounded-xl bg-stone-100 px-4 py-2.5 text-sm font-semibold text-stone-700 hover:bg-amber-100">Photo Selection</a>
+        </div>
+      </nav>
+
+      <div className="mx-auto max-w-7xl space-y-7 px-5 py-8">
+        {notice && (
+          <div className="rounded-2xl border border-stone-200 bg-white p-4 text-sm font-medium shadow-sm">{notice}</div>
+        )}
+
+        {adminSection === 'settings' && <section className="space-y-4" aria-label="Connection settings"><h2 className="text-xl font-semibold">Settings</h2><DriveConnectionCard adminToken={token} /></section>}
+        {adminSection === 'booking-discounts' && <section className="space-y-4" aria-label="বুকিং ও ডিসকাউন্ট"><CustomPackageAdmin token={token} /></section>}
+        {adminSection === 'chat-replies' && <section className="space-y-4" aria-label="চ্যাটের উত্তর"><ChatbotAdmin token={token} /></section>}
+        {adminSection === 'discussion-requests' && <section className="space-y-4" aria-label="আলোচনার অনুরোধ"><BookingDiscussionAdmin token={token} /></section>}
+
+        {adminSection === 'dashboard' && (
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <a href="/photo-selection" className="group rounded-3xl bg-stone-950 p-6 text-white shadow-sm transition hover:-translate-y-0.5">
+            <Images className="h-8 w-8 text-amber-300" />
+            <h2 className="mt-4 text-xl font-semibold">Photo Selection</h2>
+            <p className="mt-2 text-sm leading-6 text-white/60">
+              Open the existing Google Drive photo-selection admin and client gallery system.
+            </p>
+            <div className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-amber-300">
+              Open Photo Selection <ExternalLink className="h-4 w-4" />
+            </div>
+          </a>
+
+          <a href="/booking/admin" className="group rounded-3xl border border-stone-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5">
+            <FileCheck2 className="h-8 w-8 text-amber-700" />
+            <h2 className="mt-4 text-xl font-semibold">Booking Management</h2>
+            <p className="mt-2 text-sm leading-6 text-stone-500">
+              Manage bookings, client details, payments, events and agreements.
+            </p>
+          </a>
+
+          <a href="/delivery" target="_blank" rel="noreferrer" className="group rounded-3xl border border-stone-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5">
+            <Link2 className="h-8 w-8 text-amber-700" />
+            <h2 className="mt-4 text-xl font-semibold">Client Delivery</h2>
+            <p className="mt-2 text-sm leading-6 text-stone-500">
+              Preview the RamyaChobi payment, Final Delivery and access-restoration landing page.
+            </p>
+          </a>
+          <button type="button" onClick={() => setAdminSection('team')} className="group rounded-3xl border border-stone-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-amber-300 focus-visible:outline-2 focus-visible:outline-amber-600">
+            <Users className="h-8 w-8 text-amber-700" />
+            <h2 className="mt-4 text-xl font-semibold">Website Team</h2>
+            <p className="mt-2 text-sm leading-6 text-stone-500">Add team profiles, update photos and contact details, hide profiles, and assign portfolio work.</p>
+          </button>
+        </section>
+        )}
+
+        {adminSection === 'portfolio' && <PortfolioManager adminToken={token} />}
+        {adminSection === 'team' && <WebsiteTeamManager adminToken={token} />}
+        {adminSection === 'spin-results' && <SpinResultAdmin adminToken={token} />}
+
+        {adminSection === 'dashboard' && (
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {[
+            [Link2, 'Delivery portals', counts.portals],
+            [WalletCards, 'Payment pending', counts.paymentPending],
+            [CheckCircle2, 'Final active', counts.finalActive],
+            [LockKeyhole, 'Locked', counts.locked],
+            [Clipboard, 'Review requests', counts.requests],
+          ].map(([Icon, label, value]: any) => (
+            <div key={label} className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+              <Icon className="h-5 w-5 text-amber-700" />
+              <div className="mt-3 text-2xl font-semibold">{value}</div>
+              <div className="text-sm text-stone-500">{label}</div>
+            </div>
+          ))}
+        </section>
+        )}
+
+        {adminSection === 'delivery' && (
+        <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+          <div className="flex items-start gap-3">
+            <FileCheck2 className="mt-1 h-6 w-6 text-amber-700" />
+            <div>
+              <h2 className="text-xl font-semibold">Create delivery from booking</h2>
+              <p className="mt-1 text-sm text-stone-500">Select an existing booking. Package amount and verified payments are copied into the private delivery portal.</p>
+            </div>
+          </div>
+          <div className="mt-5 grid gap-4 lg:grid-cols-4">
+            <select value={selectedBooking} onChange={(e) => setSelectedBooking(e.target.value)} className="rounded-xl border border-stone-300 px-3.5 py-3 lg:col-span-2">
+              <option value="">Select booking</option>
+              {availableBookings.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.reference_no} · {b.client_name} · Due {money(Number(b.package_total) - Number(b.advance_paid) - Number(b.additional_paid))}
+                </option>
+              ))}
+            </select>
+            <input value={newBkash} onChange={(e) => setNewBkash(e.target.value)} placeholder="bKash number" className="rounded-xl border border-stone-300 px-3.5 py-3" />
+            <input type="datetime-local" value={newRetention} onChange={(e) => setNewRetention(e.target.value)} className="rounded-xl border border-stone-300 px-3.5 py-3" title="Storage retention end date" />
+          </div>
+          <button onClick={createPortal} disabled={loading || !selectedBooking} className="mt-4 rounded-xl bg-stone-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-40">
+            Save as Draft
+          </button>
+        </section>
+        )}
+
+        {adminSection === 'payments' && (
+        <div className="space-y-5">
+        <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm" aria-label="Booking payment verification">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold">Booking payment requests</h2>
+              <p className="mt-1 text-sm text-stone-500">Booking advance payments with the submitted transaction ID and amount appear here for review.</p>
+            </div>
+            <StatusPill value={`${pendingBookingPayments.length} PENDING`} />
+          </div>
+          {bookingPaymentMessage && <p role="status" className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{bookingPaymentMessage}</p>}
+          <div className="mt-5 space-y-3">
+            {bookingPaymentLoading ? (
+              <div className="rounded-2xl bg-stone-50 p-5 text-sm text-stone-500">Loading booking payments…</div>
+            ) : pendingBookingPayments.length === 0 ? (
+              <div className="rounded-2xl bg-stone-50 p-5 text-sm text-stone-500">No booking payments are waiting for review.</div>
+            ) : pendingBookingPayments.map((request) => (
+              <div key={request.id} className="grid gap-4 rounded-2xl border border-stone-200 p-4 lg:grid-cols-[1.2fr_.8fr_.7fr_auto] lg:items-center">
+                <div>
+                  <div className="font-semibold">{request.client_name || 'Client'}</div>
+                  <div className="mt-1 text-sm text-stone-500">{request.reference_no} · {request.event_name || 'Booking'}</div>
+                </div>
+                <div className="text-sm">
+                  <div><span className="text-stone-500">Method:</span> {request.method}</div>
+                  <div><span className="text-stone-500">TrxID:</span> {request.transaction_id}</div>
+                  <div><span className="text-stone-500">Payer:</span> {request.payer_phone || 'Not provided'}</div>
+                </div>
+                <div>
+                  <div className="text-lg font-semibold">{money(request.amount)}</div>
+                  {request.created_at && <div className="text-xs text-stone-500">{fmt(request.created_at)}</div>}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => void reviewBookingPayment(request.id, true)} disabled={Boolean(bookingPaymentBusyId)} className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-50">
+                    <BadgeCheck className="h-4 w-4" /> Verify
+                  </button>
+                  <button type="button" onClick={() => void reviewBookingPayment(request.id, false)} disabled={Boolean(bookingPaymentBusyId)} className="inline-flex items-center gap-1 rounded-xl bg-red-50 px-3 py-2 text-sm font-bold text-red-700 disabled:opacity-50">
+                    <XCircle className="h-4 w-4" /> Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold">Delivery payment verification</h2>
+              <p className="mt-1 text-sm text-stone-500">Package and access-fee submissions stay locked until you verify them.</p>
+            </div>
+            <StatusPill value={`${pendingRequests.length} SUBMITTED`} />
+          </div>
+          <div className="mt-5 space-y-3">
+            {pendingRequests.length === 0 ? (
+              <div className="rounded-2xl bg-stone-50 p-5 text-sm text-stone-500">No payments are waiting for review.</div>
+            ) : pendingRequests.map((s) => (
+              <div key={s.id} className="grid gap-4 rounded-2xl border border-stone-200 p-4 lg:grid-cols-[1.2fr_.8fr_.7fr_auto] lg:items-center">
+                <div>
+                  <div className="font-semibold">{s.client_name || 'Client'}</div>
+                  <div className="mt-1 text-sm text-stone-500">{s.event_name || 'Delivery'} · {s.payment_type}</div>
+                </div>
+                <div className="text-sm">
+                  <div><span className="text-stone-500">{s.payment_method} payer:</span> {s.payer_phone}</div>
+                  <div><span className="text-stone-500">TrxID:</span> {s.transaction_id}</div>
+                </div>
+                <div>
+                  <div className="text-lg font-semibold">{money(s.amount)}</div>
+                  {s.selected_days ? <div className="text-xs text-stone-500">{s.selected_days} access day(s)</div> : null}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => viewPaymentProof(s.id)} disabled={Boolean(proofLoadingId)} className="inline-flex items-center gap-1 rounded-xl border border-stone-300 px-3 py-2 text-sm font-bold">
+                    <Images className="h-4 w-4" /> {proofLoadingId === s.id ? 'Opening…' : 'Screenshot'}
+                  </button>
+                  <button onClick={() => review(s.id, 'VERIFY')} disabled={loading} className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-bold text-white">
+                    <BadgeCheck className="h-4 w-4" /> Verify
+                  </button>
+                  <button onClick={() => review(s.id, 'REJECT')} disabled={loading} className="inline-flex items-center gap-1 rounded-xl bg-red-50 px-3 py-2 text-sm font-bold text-red-700">
+                    <XCircle className="h-4 w-4" /> Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+        </div>
+        )}
+        {adminSection === 'delivery' && (
+        <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div><p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Client delivery portals</p><h2 className="mt-1 text-2xl font-bold">ক্লায়েন্ট ডেলিভারি তালিকা</h2><p className="mt-2 text-sm text-stone-500">১. নাম খুঁজুন → ২. ক্লায়েন্ট বাছুন → ৩. ছবি, পেমেন্ট ও ডেলিভারি দেখুন</p></div>
+            <div className="flex flex-wrap items-center gap-2"><span role="status" className="rounded-full bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">{portals.length} জনের মধ্যে {filteredPortals.length} জন</span><button type="button" aria-expanded={showManualClient} aria-controls="manual-client-form" onClick={() => { setShowManualClient(true); setManualError(''); setManualSuccess(''); }} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-800 px-4 py-3 text-sm font-bold text-white"><Plus className="h-4 w-4" />কাস্টমার যোগ করুন / Add Customer</button></div>
+          </div>
+          {manualSuccess && <p role="status" className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">{manualSuccess}</p>}
+          {showManualClient && <form id="manual-client-form" onSubmit={saveManualClient} className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5">
+            <h3 className="text-lg font-bold">বুকিং ছাড়া পুরোনো / নতুন কাস্টমার যোগ করুন</h3>
+            <p className="mt-2 text-sm text-stone-600">আগে অনলাইনে বুকিং না থাকলেও সরাসরি হিসাব ও ডেলিভারি পোর্টাল তৈরি করুন। একই কাজের কাস্টমার আগে থাকলে তালিকা থেকে তার হিসাব খুলুন।</p>
+            <fieldset disabled={manualBusy} className="mt-4 space-y-4 disabled:opacity-60">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <label className="text-sm font-semibold">ক্লায়েন্টের নাম *<input autoFocus required minLength={2} maxLength={150} autoComplete="name" value={manualDraft.client_name} onChange={e => changeManualDraft({ client_name: e.target.value })} className="mt-2 min-h-11 w-full rounded-xl border bg-white px-3 py-2 font-normal" /></label>
+                <label className="text-sm font-semibold">মোবাইল নম্বর *<input required type="tel" autoComplete="tel" maxLength={25} value={manualDraft.phone} onChange={e => changeManualDraft({ phone: e.target.value })} className="mt-2 min-h-11 w-full rounded-xl border bg-white px-3 py-2 font-normal" /></label>
+                <label className="min-w-0 text-sm font-semibold">অনুষ্ঠান / কাজের তারিখ *<input required type="date" value={manualDraft.event_date} onChange={e => changeManualDraft({ event_date: e.target.value })} className="mt-2 min-h-11 w-full min-w-0 rounded-xl border bg-white px-3 py-2 font-normal" /></label>
+                <label className="text-sm font-semibold">অনুষ্ঠানের নাম (ঐচ্ছিক)<input maxLength={200} placeholder="যেমন: বিয়ে, জন্মদিন" value={manualDraft.event_name} onChange={e => changeManualDraft({ event_name: e.target.value })} className="mt-2 min-h-11 w-full rounded-xl border bg-white px-3 py-2 font-normal" /></label>
+                <label className="text-sm font-semibold">মোট বিল (টাকা) *<input required type="number" inputMode="decimal" min={0} max={1000000000} step="0.01" value={manualDraft.total} onChange={e => changeManualDraft({ total: e.target.value })} className="mt-2 min-h-11 w-full rounded-xl border bg-white px-3 py-2 font-normal" /></label>
+                <label className="text-sm font-semibold">আগে পাওয়া / জমা টাকা *<input required type="number" inputMode="decimal" min={0} max={Number(manualDraft.total) || 0} step="0.01" value={manualDraft.paid} onChange={e => changeManualDraft({ paid: e.target.value })} className="mt-2 min-h-11 w-full rounded-xl border bg-white px-3 py-2 font-normal" /></label>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white p-4"><div><span className="text-sm text-stone-500">বাকি টাকা</span><strong className="ml-3 text-xl">{money(Number.isFinite(manualDue) ? manualDue : 0)}</strong><p className="mt-1 text-xs text-stone-500">আগের জমা একবারই হিসাবে যোগ হবে। পরে পেমেন্ট অংশে নতুন টাকা যোগ করুন।</p></div><button type="button" disabled={!manualDraft.total} onClick={() => changeManualDraft({ paid: manualDraft.total })} className="min-h-11 rounded-xl border border-emerald-300 px-3 py-2 text-sm font-bold text-emerald-900 disabled:opacity-40">পুরো বিল পেয়েছি</button></div>
+              <div><p className="mb-2 text-sm font-semibold">ডেলিভারির অবস্থা</p><div className="flex flex-wrap gap-3"><label className="flex min-h-11 items-center gap-2 rounded-xl border bg-white px-3 py-2 text-sm"><input type="radio" name="manual-delivery-state" checked={!manualDraft.delivered} onChange={() => changeManualDraft({ delivered: false })} />ডেলিভারি বাকি / প্রস্তুত হচ্ছে</label><label className="flex min-h-11 items-center gap-2 rounded-xl border bg-white px-3 py-2 text-sm"><input type="radio" name="manual-delivery-state" disabled={!manualDraft.total || manualDue > 0} checked={manualDraft.delivered} onChange={() => changeManualDraft({ delivered: true })} />পূর্ণ ডেলিভারি (বিল পরিশোধিত)</label></div><p className="mt-2 text-xs text-stone-500">পূর্ণ ডেলিভারি চিহ্নিত করলে আজ থেকে ৩০ দিনের অ্যাক্সেস গণনা হবে। পোর্টাল প্রথমে ড্রাফট থাকবে; ফাইল যোগ করে Publish করুন। এই এন্ট্রিতে স্বয়ংক্রিয় লেট ফি চালু হবে না।</p></div>
+              {manualError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{manualError}</p>}
+              <div className="flex flex-wrap gap-2"><button type="submit" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-800 px-5 py-3 font-bold text-white">{manualBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}{manualBusy ? 'সেভ হচ্ছে…' : 'কাস্টমার ও ডেলিভারি সেভ করুন'}</button><button type="button" onClick={() => { setShowManualClient(false); setManualError(''); }} className="min-h-11 rounded-xl border bg-white px-4 py-3 font-bold">এখন নয়</button></div>
+            </fieldset>
+          </form>}
+          <div className="mt-5 grid gap-3 rounded-2xl bg-stone-50 p-4 sm:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr_auto]">
+            <label className="min-w-0 text-sm font-semibold">ক্লায়েন্ট সার্চ<input type="search" value={portalSearch} onChange={e => setPortalSearch(e.target.value)} placeholder="নাম, মোবাইল, অনুষ্ঠান বা প্যাকেজ" className="mt-2 min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 font-normal" /></label>
+            <label className="text-sm font-semibold">কোন তারিখ?<select value={portalDateField} onChange={e => setPortalDateField(e.target.value as DirectoryDateField)} className="mt-2 min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 font-normal"><option value="event_date">অনুষ্ঠানের তারিখ</option><option value="final_delivery_at">ডেলিভারির তারিখ</option><option value="created_at">যোগ করার তারিখ</option></select></label>
+            <label className="min-w-0 text-sm font-semibold">ক্যালেন্ডার থেকে দিন<input type="date" value={portalDate} onChange={e => setPortalDate(e.target.value)} className="mt-2 min-h-11 w-full min-w-0 rounded-xl border border-stone-300 bg-white px-3 py-2 font-normal" /></label>
+            <label className="text-sm font-semibold">তালিকার ক্রম<select value={portalSort} onChange={e => setPortalSort(e.target.value as DirectorySort)} className="mt-2 min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 font-normal"><option value="name">নাম অনুযায়ী</option><option value="newest">নতুন তারিখ আগে</option><option value="oldest">পুরোনো তারিখ আগে</option></select></label>
+            <button type="button" onClick={() => { setPortalSearch(''); setPortalDate(''); setPortalDateField('event_date'); setPortalSort('name'); }} className="min-h-11 self-end rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-bold">সব দেখুন</button>
+          </div>
+          <p className="mt-2 text-xs text-stone-500">তারিখ না দিলে সব ক্লায়েন্ট দেখা যাবে। সময়যুক্ত তারিখ বাংলাদেশ সময় অনুযায়ী দেখানো হয়।</p>
+          {filteredPortals.length === 0 ? <div className="mt-5 rounded-2xl border border-dashed border-stone-300 p-8 text-center"><Users className="mx-auto mb-3 h-8 w-8 text-stone-400" /><h3 className="font-bold">{portals.length ? 'এই সার্চ বা তারিখে ক্লায়েন্ট পাওয়া যায়নি' : 'এখনও কোনো ক্লায়েন্ট ডেলিভারি নেই'}</h3><p className="mt-2 text-sm text-stone-500">{portals.length ? 'নাম বা তারিখ বদলান, অথবা “সব দেখুন” চাপুন।' : 'উপরের Client Delivery অংশ থেকে বুকিং বেছে পোর্টাল তৈরি করুন।'}</p></div> :
+          <div className="mt-5 grid items-start gap-5 lg:grid-cols-[minmax(260px,340px)_minmax(0,1fr)]">
+            <aside aria-label="ক্লায়েন্টের নামের তালিকা" className="overflow-hidden rounded-2xl border border-stone-200">
+              <div className="flex justify-between bg-stone-50 px-4 py-3 text-xs font-bold text-stone-500"><span>ক্রম · ক্লায়েন্টের নাম</span><span>বাকি টাকা · পোর্টাল</span></div>
+              <ol className="max-h-[440px] divide-y divide-stone-100 overflow-y-auto lg:max-h-[700px]">
+                {filteredPortals.map((client, index) => <li key={client.id} className="flex items-stretch gap-2 p-2">
+                  <button type="button" aria-pressed={activePortal?.id === client.id} aria-controls={`portal-${activePortal?.id}`} onClick={() => selectDirectoryClient(client.id)} className={'flex min-h-20 min-w-0 flex-1 items-start gap-3 rounded-xl px-2 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-emerald-700 '+(activePortal?.id === client.id ? 'bg-emerald-50 text-emerald-950' : 'bg-white hover:bg-stone-50')}>
+                    <span className={'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold '+(activePortal?.id === client.id ? 'bg-emerald-800 text-white' : 'bg-stone-100 text-stone-500')}>{index + 1}</span>
+                    <span className="min-w-0 flex-1"><strong className="block break-words text-sm">{client.client_name}</strong><span className="mt-1 block break-words text-xs text-stone-500">{client.client_phone || client.whatsapp_number || 'মোবাইল দেওয়া নেই'}</span><span className="mt-1 block break-words text-xs text-stone-500">{client.event_name || 'অনুষ্ঠানের নাম নেই'} · {directoryDate(client[portalDateField]) || 'তারিখ দেওয়া নেই'}</span></span>
+                    <span className="shrink-0 text-right text-xs font-bold"><span className={Number(client.remaining_due) > 0 ? 'text-amber-800' : 'text-emerald-700'}>{money(client.remaining_due)}</span><span className="mt-2 block font-normal text-stone-400">{activePortal?.id === client.id ? 'নির্বাচিত' : 'বিস্তারিত'}</span></span>
+                  </button>
+                  <a href={`/delivery/${client.secure_token}${client.is_published ? '' : '?preview=admin'}`} target="_blank" rel="noreferrer" aria-label={`${client.client_name} এর ${client.is_published ? 'ক্লায়েন্ট ডেলিভারি' : 'প্রিভিউ'} খুলুন`} title={client.is_published ? 'ক্লায়েন্ট ডেলিভারি খুলুন' : 'প্রিভিউ খুলুন'} className="inline-flex min-h-11 w-[76px] shrink-0 flex-col items-center justify-center gap-1 self-center rounded-xl border border-emerald-200 bg-white px-1.5 py-2 text-center text-[10px] font-bold leading-tight text-emerald-900 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-emerald-700"><ExternalLink className="h-4 w-4" />{client.is_published ? 'পোর্টাল খুলুন' : 'প্রিভিউ'}</a>
+                </li>)}
+              </ol>
+            </aside>
+            <div className="min-w-0">
+            {activePortal && [activePortal].map((portal) => {
+              const portalSection = portalSections[portal.id] || 'overview';
+              const canActivate = portal.payment_status === 'FULLY_PAID' && portal.delivery_status !== 'FINAL_DELIVERED';
+              return (
+                <div id={`portal-${portal.id}`} key={portal.id} tabIndex={-1} aria-label={`${portal.client_name} এর ডেলিভারির বিস্তারিত`} className={`scroll-mt-24 rounded-2xl border p-4 outline-none ${activePortal?.id === portal.id ? 'border-amber-400 ring-2 ring-amber-100' : 'border-stone-200'}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <div className="mb-3 flex flex-wrap gap-2"><button type="button" onClick={() => selectDirectoryClient(filteredPortals[(filteredPortals.findIndex(p => p.id === portal.id) - 1 + filteredPortals.length) % filteredPortals.length].id)} disabled={filteredPortals.length < 2} className="min-h-9 rounded-lg border px-3 text-xs font-bold disabled:opacity-40">← আগের ক্লায়েন্ট</button><button type="button" onClick={() => selectDirectoryClient(filteredPortals[(filteredPortals.findIndex(p => p.id === portal.id) + 1) % filteredPortals.length].id)} disabled={filteredPortals.length < 2} className="min-h-9 rounded-lg border px-3 text-xs font-bold disabled:opacity-40">পরের ক্লায়েন্ট →</button></div>
+                      <div className="break-words text-lg font-semibold">{portal.client_name}</div>
+                      <p className="mt-1 text-xs text-stone-500">{dateLabels[portalDateField]}: {directoryDate(portal[portalDateField]) || 'তারিখ দেওয়া নেই'}</p>
+                      <div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => copyLink(portal)} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-emerald-800 px-3 py-2 text-sm font-bold text-white"><Copy className="h-4 w-4" />লিংক কপি</button><a href={`/delivery/${portal.secure_token}`} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-stone-300 px-3 py-2 text-sm font-bold"><ExternalLink className="h-4 w-4" />ক্লায়েন্ট পেজ খুলুন</a></div>
+                      <div className="mt-1 text-sm text-stone-500">{portal.event_name || 'Event'} · {portal.package_name || 'Package'}</div>
+                      <div className="mt-2 text-xs text-stone-500">{portal.client_phone || portal.whatsapp_number || 'No phone saved'}</div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <StatusPill value={portal.payment_status} />
+                        <StatusPill value={portal.delivery_status} />
+                        <StatusPill value={portal.gallery_status} />
+                        <StatusPill value={portal.is_published ? 'PUBLISHED' : 'DRAFT'} />
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs uppercase tracking-wider text-stone-400">Remaining due</div>
+                      <div className="mt-1 text-xl font-semibold">{money(portal.remaining_due)}</div>
+                      <div className="mt-1 text-xs text-stone-500">Paid {money(portal.total_paid ?? portal.verified_total_paid)}</div>
+                    </div>
+                  </div>
+
+                  <DeliveryPaymentShortcut portal={portal} onReview={() => {
+                    setPortalSections(current => ({ ...current, [portal.id]: 'payments' }));
+                    setPaymentFocusId(portal.id);
+                  }} />
+                  <nav aria-label={`${portal.client_name} ডেলিভারির বিভাগ`} className="mt-4 flex flex-wrap gap-2 rounded-2xl bg-stone-100 p-2">
+                    {Object.entries({ overview: 'সারাংশ', files: '১. ছবি ও ভিডিও', payments: '২. পেমেন্ট', delivery: '৩. ডেলিভারি নিয়ন্ত্রণ' }).map(([key, label]) => <button key={key} type="button" aria-current={portalSection === key ? 'page' : undefined} onClick={() => setPortalSections(current => ({ ...current, [portal.id]: key }))} className={`rounded-xl px-4 py-2.5 text-sm font-bold focus-visible:outline-2 focus-visible:outline-emerald-600 ${portalSection === key ? 'bg-stone-950 text-white shadow-sm' : 'text-stone-600 hover:bg-white'}`}>{label}</button>)}
+                  </nav>
+                  {portalSection === 'overview' && <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    {[
+                      { label: 'ছবি ও ভিডিও', value: `${(filesByPortal[portal.id] || []).length}টি ফাইল`, next: 'files' },
+                      { label: 'পেমেন্ট', value: Number(portal.package_price) <= 0 ? 'প্যাকেজের দাম সেট করুন' : Number(portal.remaining_due) > 0 ? `বাকি ${money(portal.remaining_due)}` : 'বকেয়া নেই', next: 'payments' },
+                      { label: 'ক্লায়েন্টের পেজ', value: portal.is_published ? 'প্রকাশিত' : 'এখনো ড্রাফট', next: 'delivery' },
+                    ].map(item => <button key={item.next} type="button" onClick={() => setPortalSections(current => ({ ...current, [portal.id]: item.next }))} className="rounded-2xl border border-stone-200 bg-white p-4 text-left hover:border-emerald-400 focus-visible:outline-2 focus-visible:outline-emerald-600"><span className="block text-xs font-semibold text-stone-500">{item.label}</span><strong className="mt-2 block text-sm">{item.value}</strong><span className="mt-3 block text-xs font-bold text-emerald-800">বিস্তারিত দেখুন →</span></button>)}
+                  </div>}
+
+                  <div hidden={portalSection !== 'overview'} className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="rounded-xl bg-stone-50 p-3"><span className="block text-stone-500">Final Delivery</span><strong>{fmt(portal.final_delivery_at)}</strong></div>
+                    <div className="rounded-xl bg-stone-50 p-3"><span className="block text-stone-500">Free access ends</span><strong>{fmt(portal.free_access_expires_at)}</strong></div>
+                    <div className="rounded-xl bg-stone-50 p-3"><span className="block text-stone-500">Temporary access</span><strong>{fmt(portal.access_expires_at)}</strong></div>
+                    <div className="rounded-xl bg-stone-50 p-3"><span className="block text-stone-500">Storage retention</span><strong>{fmt(portal.storage_retention_until)}</strong></div>
+                    <div className="rounded-xl bg-stone-50 p-3"><span className="block text-stone-500">Late fee</span><strong>{Number((portal.late_fee as any)?.balance ?? (portal.late_fee as any)?.calculated_fee ?? 0) > 0 ? money((portal.late_fee as any)?.balance ?? (portal.late_fee as any)?.calculated_fee) : 'None'}</strong></div>
+                  </div>
+
+                  <section hidden={portalSection !== 'files'} className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                    <DeliveryDownloadSettings portal={portal} token={token} onChanged={load} />
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h3 className="font-semibold">Final Delivery Files</h3>
+                        <p className="mt-1 text-xs text-stone-600">Browse your Google Drive or paste a private photo, video, or folder link. Customer access still follows payment and Drive Link Access settings.</p>
+                      </div>
+                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-stone-600">{(filesByPortal[portal.id] || []).length} file(s)</span>
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-2">
+                      <input value={fileDrafts[portal.id]?.url || ''} onChange={(e) => { const url = e.target.value; updateFileDraft(portal.id, { url, ...(isGoogleDriveFolderLink(url) ? { type: 'FOLDER' as const } : {}) }); }} placeholder="Private Google Drive photo, video, or folder link" className="rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm" />
+                      <button type="button" onClick={() => void openDeliveryDrivePicker(portal.id)} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-white px-3 py-2.5 text-sm font-bold text-amber-900 disabled:opacity-50"><Link2 className="h-4 w-4" /> Browse Drive</button>
+                      <select value={fileDrafts[portal.id]?.type || 'PHOTO'} onChange={(e) => updateFileDraft(portal.id, { type: e.target.value as 'PHOTO' | 'VIDEO' | 'DOCUMENT' | 'FOLDER' })} className="rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm">
+                        <option value="PHOTO">Photo</option><option value="VIDEO">Video</option><option value="DOCUMENT">Document</option><option value="FOLDER">Google Drive Folder</option>
+                      </select>
+                      <input value={fileDrafts[portal.id]?.fileName || ''} onChange={(e) => updateFileDraft(portal.id, { fileName: e.target.value })} placeholder="File name (optional)" className="rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm" />
+                      <input value={fileDrafts[portal.id]?.title || ''} onChange={(e) => updateFileDraft(portal.id, { title: e.target.value })} placeholder="Display title (optional)" className="rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm" />
+                      <input value={fileDrafts[portal.id]?.sortOrder || ''} onChange={(e) => updateFileDraft(portal.id, { sortOrder: e.target.value })} type="number" placeholder="Order" className="rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm" />
+                      <button onClick={() => addFinalDeliveryFile(portal.id)} disabled={loading} className="rounded-xl bg-amber-300 px-3.5 py-2 text-sm font-bold text-stone-950 disabled:opacity-50">{loading ? 'Validating...' : 'Verify & Save'}</button>
+                    </div>
+                    <div className="mt-3 rounded-xl border border-emerald-200 bg-white p-4">
+                      <h4 className="font-semibold text-emerald-950">RAW Files · Photos & Videos</h4>
+                      <p className="mt-1 text-xs leading-5 text-stone-600">প্রিভিউ ও আলাদা Download All সুবিধার জন্য normal Drive folder import করুন। ZIP দিতে চাইলে আলাদা ZIP link ব্যবহার করুন। ফাইলগুলো connected Drive account থেকে access করা যেতে হবে।</p>
+                      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                        {(['photos', 'videos'] as const).map((media) => {
+                          const mediaLabel = media === 'photos' ? 'Photos' : 'Videos';
+                          return <div key={media} className="rounded-xl border border-stone-200 bg-stone-50 p-3">
+                            <h5 className="mb-3 text-sm font-bold text-stone-800">RAW {mediaLabel}</h5>
+                            <label className="mb-1 block text-xs font-semibold text-stone-600">Normal folder for preview and individual files</label>
+                            <input value={rawFolderLinksByPortal[portal.id]?.[media] || ''} onChange={(event) => setRawFolderLinksByPortal((current) => ({ ...current, [portal.id]: { photos: current[portal.id]?.photos || '', videos: current[portal.id]?.videos || '', [media]: event.target.value } }))} placeholder="Google Drive folder link" className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm" />
+                            <button type="button" onClick={() => void importRawDeliveryFolder(portal.id, media)} disabled={loading} className="mt-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-emerald-700 bg-white px-4 py-2 text-sm font-bold text-emerald-900 disabled:opacity-50">
+                              <Images className="h-4 w-4" /> {loading ? 'Importing…' : `Import RAW ${mediaLabel} Folder`}
+                            </button>
+                            <div className="my-3 border-t border-stone-200" />
+                            <label className="mb-1 block text-xs font-semibold text-stone-600">ZIP archive</label>
+                            <input value={rawZipLinksByPortal[portal.id]?.[media] || ''} onChange={(event) => setRawZipLinksByPortal((current) => ({ ...current, [portal.id]: { photos: current[portal.id]?.photos || '', videos: current[portal.id]?.videos || '', [media]: event.target.value } }))} placeholder="Google Drive .zip file link" className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm" />
+                            <button type="button" onClick={() => void addRawZipFromDrive(portal.id, media)} disabled={loading} className="mt-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-900 disabled:opacity-50">
+                              <Archive className="h-4 w-4" /> {loading ? 'Verifying…' : `Add RAW ${mediaLabel} ZIP`}
+                            </button>
+                          </div>;
+                        })}
+                      </div>
+                    </div>
+                    {fileMetaByPortal[portal.id] && (
+                      <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                        <strong>Private file connected:</strong> {fileMetaByPortal[portal.id].name || 'Google Drive item'} · {fileMetaByPortal[portal.id].mimeType || 'Unknown type'}{fileMetaByPortal[portal.id].size ? ` · ${fileMetaByPortal[portal.id].size} bytes` : ''}
+                      </div>
+                    )}
+                    {fileErrorByPortal[portal.id] && (
+                      <div className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-800">
+                        <strong>Video/file link could not be saved:</strong> {fileErrorByPortal[portal.id]}
+                      </div>
+                    )}
+                    <div className="mt-3 space-y-2">
+                      {(filesByPortal[portal.id] || []).map((file) => (
+                        <div key={file.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-sm">
+                          <div className="min-w-0"><span className="font-semibold">{file.title || file.file_name || 'Untitled delivery file'}</span><span className="ml-2 text-xs text-stone-500">{file.file_type}</span></div>
+                          <div className="flex gap-1.5"><button onClick={() => editFinalDeliveryFile(portal.id, file)} disabled={loading} className="rounded-lg bg-stone-100 px-2.5 py-1.5 text-xs font-bold text-stone-700 disabled:opacity-50">Edit</button><button onClick={() => toggleFinalDeliveryFile(portal.id, file)} disabled={loading} className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800 disabled:opacity-50">{file.is_visible ? 'Hide' : 'Show'}</button><button onClick={() => removeFinalDeliveryFile(portal.id, file.id)} disabled={loading} className="rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50">Remove</button></div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section hidden={portalSection !== 'payments'} id={`payment-ledger-${portal.id}`} tabIndex={-1} className="mt-4 rounded-2xl border border-stone-200 bg-stone-50 p-4 focus:outline-2 focus:outline-emerald-600">
+                    <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">Payment ledger</h3><span className="text-xs text-stone-500">Verified payments count toward total paid</span></div>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      <label className="block text-xs font-semibold text-stone-600"><span className="mb-1 block">Payment date</span><input type="date" value={ledgerDraft(portal.id).date} onChange={(e) => updateLedgerDraft(portal.id, { date: e.target.value })} className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm" /></label>
+                      <label className="block text-xs font-semibold text-stone-600"><span className="mb-1 block">Payment method</span><select value={ledgerDraft(portal.id).method} onChange={(e) => updateLedgerDraft(portal.id, { method: e.target.value as any })} className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm"><option value="CASH">Cash</option><option value="BKASH">bKash</option><option value="NAGAD">Nagad</option><option value="BANK">Bank</option></select></label>
+                      <label className="block text-xs font-semibold text-stone-600"><span className="mb-1 block">Paid amount</span><input type="number" min="0" value={ledgerDraft(portal.id).amount} onChange={(e) => updateLedgerDraft(portal.id, { amount: e.target.value })} placeholder="Amount" className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm" /></label>
+                      <label className="block text-xs font-semibold text-stone-600"><span className="mb-1 block">Transaction ID</span><input value={ledgerDraft(portal.id).transactionId} onChange={(e) => updateLedgerDraft(portal.id, { transactionId: e.target.value })} placeholder="Optional for cash" className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm" /></label>
+                      <label className="block text-xs font-semibold text-stone-600"><span className="mb-1 block">Payment status</span><select value={ledgerDraft(portal.id).status} onChange={(e) => updateLedgerDraft(portal.id, { status: e.target.value as any })} className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm"><option value="VERIFIED">Verified</option><option value="PENDING">Pending</option><option value="REJECTED">Rejected</option></select></label>
+                    </div>
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                      <input value={ledgerDraft(portal.id).note} onChange={(e) => updateLedgerDraft(portal.id, { note: e.target.value })} placeholder="Payment note (optional)" className="min-w-0 flex-1 rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm" />
+                      <button type="button" onClick={() => saveLedgerPayment(portal.id)} disabled={loading} className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-stone-950 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50">{loading ? 'Saving...' : 'Add payment'}</button>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {(ledgerByPortal[portal.id] || []).map((payment) => (
+                        <div key={payment.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-sm">
+                          <div><strong>{money(payment.amount)}</strong> · {payment.payment_method} · {payment.payment_date} <StatusPill value={payment.status} />{payment.note ? <span className="ml-2 text-stone-500">{payment.note}</span> : null}</div>
+                          <div className="flex gap-1"><button onClick={() => setLedgerStatus(payment, payment.status === 'VERIFIED' ? 'PENDING' : 'VERIFIED')} className="rounded-lg bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800">{payment.status === 'VERIFIED' ? 'Mark pending' : 'Verify'}</button><button onClick={() => removeLedgerPayment(payment.id)} className="rounded-lg bg-red-50 px-2 py-1 text-xs font-bold text-red-700">Delete</button></div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <div hidden={portalSection !== 'delivery'}>
+                  <section className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                    <div><h3 className="text-sm font-bold">Public Final Delivery তালিকা</h3><p className="mt-1 text-xs text-stone-600">{portal.public_listed && portal.is_published && portal.preview_enabled !== false ? '/delivery-তে ক্লায়েন্টের পোর্টাল সবার জন্য খোলা আছে।' : 'এই ক্লায়েন্ট /delivery তালিকায় নেই।'}</p><p className="mt-1 text-xs text-rose-700">দেখালে যে কেউ নাম/তারিখ দেখে পোর্টাল খুলে পেমেন্ট ও অ্যাক্সেসের তথ্য দেখতে পারবে।</p></div>
+                    <button type="button" onClick={() => void setPublicListing(portal)} disabled={loading || (!portal.public_listed && (!portal.is_published || portal.preview_enabled === false))} className="rounded-xl bg-stone-950 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40">{portal.public_listed ? 'লুকান' : 'দেখান'}</button>
+                  </section>
+
+                  <section className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                    <div><h3 className="text-sm font-bold">ফুল পেমেন্টের পরে ডাউনলোড</h3><p className="mt-1 text-xs text-stone-600">অনুমতি: {portal.public_download_enabled ? 'চালু' : 'বন্ধ'}। বকেয়া থাকলে ডাউনলোড বন্ধ থাকবে।</p><p className="mt-1 text-xs text-stone-500">দেখান, Activate Final Delivery ও Photo / Video download ON থাকতে হবে। অ্যাক্সেসের মেয়াদ ও ফি-র নিয়মও প্রযোজ্য।</p></div>
+                    <button type="button" onClick={() => void changePublicDownload(portal)} disabled={loading || (!portal.public_download_enabled && (Number(portal.package_price) <= 0 || Number(portal.remaining_due) > 0))} className="rounded-xl bg-emerald-800 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40">{portal.public_download_enabled ? 'ডাউনলোড বন্ধ করুন' : 'ডাউনলোডের অনুমতি দিন'}</button>
+                  </section>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {portal.client_phone && <a href={portalWhatsapp(portal.whatsapp_number || portal.client_phone)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-3.5 py-2 text-sm font-bold text-white">WhatsApp</a>}
+                    <details className="rounded-xl border border-red-100 p-2"><summary className="cursor-pointer px-2 text-sm font-semibold text-stone-600">অন্যান্য</summary><div className="mt-2"><button type="button" onClick={() => { setDeleteTarget(portal); setDeleteName(''); setDeleteError(''); }} disabled={loading} className="rounded-xl bg-red-50 px-3.5 py-2 text-sm font-bold text-red-700">Delete Client Delivery</button></div></details>
+                    <button onClick={() => startPortalEdit(portal)} className="inline-flex items-center gap-2 rounded-xl bg-amber-100 px-3.5 py-2 text-sm font-bold text-amber-900">Edit Client</button>
+                    <button onClick={() => previewClientPage(portal)} className="inline-flex items-center gap-2 rounded-xl border border-stone-300 px-3.5 py-2 text-sm font-bold"><ExternalLink className="h-4 w-4" /> Preview exact page</button>
+                    <button onClick={() => setPublished(portal, !portal.is_published)} disabled={loading} className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-bold text-white ${portal.is_published ? 'bg-stone-700' : 'bg-emerald-700'}`}>
+                      {portal.is_published ? 'Save as Draft' : 'Publish Delivery'}
+                    </button>
+                    <button onClick={() => restorePortal(portal.id, false)} disabled={loading} className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-3.5 py-2 text-sm font-bold text-indigo-800">Restore Access</button>
+                    <button onClick={() => restorePortal(portal.id, true)} disabled={loading} className="inline-flex items-center gap-2 rounded-xl bg-violet-50 px-3.5 py-2 text-sm font-bold text-violet-800">Waive Fee</button>
+                    <button onClick={() => copyLink(portal)} className="inline-flex items-center gap-2 rounded-xl bg-stone-950 px-3.5 py-2 text-sm font-bold text-white">
+                      <Copy className="h-4 w-4" /> Copy Client Link
+                    </button>
+                    <a href={`/delivery/${portal.secure_token}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-stone-300 px-3.5 py-2 text-sm font-bold">
+                      <ExternalLink className="h-4 w-4" /> Open
+                    </a>
+                    {canActivate && (
+                      <button onClick={() => activate(portal.id)} disabled={loading} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3.5 py-2 text-sm font-bold text-white">
+                        <CheckCircle2 className="h-4 w-4" /> Activate Final Delivery
+                      </button>
+                    )}
+                    <button onClick={() => startEdit(portal)} className="inline-flex items-center gap-2 rounded-xl bg-amber-50 px-3.5 py-2 text-sm font-bold text-amber-800">
+                      <Settings2 className="h-4 w-4" /> Delivery Settings
+                    </button>
+                  </div>
+
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                    <button type="button" onClick={() => togglePortalPermission(portal, 'preview')} disabled={loading} className={`rounded-xl px-3 py-2 text-xs font-bold ${portal.preview_enabled === false ? 'bg-stone-200 text-stone-700' : 'bg-emerald-100 text-emerald-800'}`}>
+                      Preview: {portal.preview_enabled === false ? 'OFF' : 'ON'}
+                    </button>
+                    <button type="button" onClick={() => togglePortalPermission(portal, 'photo')} disabled={loading} className={`rounded-xl px-3 py-2 text-xs font-bold ${portal.photo_download_permission === true ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-200 text-stone-700'}`}>
+                      Photo download: {portal.photo_download_permission === true ? 'ON' : 'OFF'}
+                    </button>
+                    <button type="button" onClick={() => togglePortalPermission(portal, 'video')} disabled={loading} className={`rounded-xl px-3 py-2 text-xs font-bold ${portal.video_download_permission === true ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-200 text-stone-700'}`}>
+                      Video download: {portal.video_download_permission === true ? 'ON' : 'OFF'}
+                    </button>
+                    <button type="button" onClick={() => togglePortalPermission(portal, 'drive')} disabled={loading} className={`rounded-xl px-3 py-2 text-xs font-bold ${portal.drive_link_access_enabled === true ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-200 text-stone-700'}`}>
+                      Drive link access: {portal.drive_link_access_enabled === true ? 'ON' : 'OFF'}
+                    </button>
+                    <button type="button" onClick={() => void setDeliveryDocumentPermission({ token, portalId: portal.id, allowed: portal.document_download_permission !== true }).then(() => load()).catch((error: any) => setNotice(error?.message || 'Could not update document permission.'))} disabled={loading} className={`rounded-xl px-3 py-2 text-xs font-bold ${portal.document_download_permission === true ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-200 text-stone-700'}`}>
+                      Document / RAW ZIP download: {portal.document_download_permission === true ? 'ON' : 'OFF'}
+                    </button>
+                  </div>
+
+                  </div>
+
+                  {selectedPortalId === portal.id && Object.keys(portalEdit).length > 0 && (
+                    <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                      <h3 className="font-semibold">Edit client details, message and access policy</h3>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <input value={portalEdit.clientName || ''} onChange={(e) => updatePortalEdit({ clientName: e.target.value })} placeholder="Client name" className="rounded-xl border border-stone-300 bg-white px-3 py-2.5" />
+                        <input value={portalEdit.eventName || ''} onChange={(e) => updatePortalEdit({ eventName: e.target.value })} placeholder="Event name" className="rounded-xl border border-stone-300 bg-white px-3 py-2.5" />
+                        <input value={portalEdit.clientPhone || ''} onChange={(e) => updatePortalEdit({ clientPhone: e.target.value })} placeholder="Phone number" className="rounded-xl border border-stone-300 bg-white px-3 py-2.5" />
+                        <input value={portalEdit.whatsappNumber || ''} onChange={(e) => updatePortalEdit({ whatsappNumber: e.target.value })} placeholder="WhatsApp number" className="rounded-xl border border-stone-300 bg-white px-3 py-2.5" />
+                        <input value={portalEdit.packagePrice || ''} onChange={(e) => updatePortalEdit({ packagePrice: e.target.value })} type="number" min="0" placeholder="Package price" className="rounded-xl border border-stone-300 bg-white px-3 py-2.5" />
+                        <input value={portalEdit.advancePaid || ''} onChange={(e) => updatePortalEdit({ advancePaid: e.target.value })} type="number" min="0" placeholder="Advance paid" className="rounded-xl border border-stone-300 bg-white px-3 py-2.5" />
+                        <input value={portalEdit.freeAccessDays || ''} onChange={(e) => updatePortalEdit({ freeAccessDays: e.target.value })} type="number" placeholder="Free access days" className="rounded-xl border border-stone-300 bg-white px-3 py-2.5" />
+                        <input value={portalEdit.dailyLateFee || ''} onChange={(e) => updatePortalEdit({ dailyLateFee: e.target.value })} type="number" placeholder="Daily late fee" className="rounded-xl border border-stone-300 bg-white px-3 py-2.5" />
+                        <input value={portalEdit.gracePeriodDays || ''} onChange={(e) => updatePortalEdit({ gracePeriodDays: e.target.value })} type="number" placeholder="Grace days" className="rounded-xl border border-stone-300 bg-white px-3 py-2.5" />
+                        <input value={portalEdit.lateFeeOverride || ''} onChange={(e) => updatePortalEdit({ lateFeeOverride: e.target.value })} type="number" placeholder="Fee override (optional)" className="rounded-xl border border-stone-300 bg-white px-3 py-2.5" />
+                        <label className="flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm"><input type="checkbox" checked={Boolean(portalEdit.lateFeeEnabled)} onChange={(e) => updatePortalEdit({ lateFeeEnabled: e.target.checked })} /> Late fee enabled</label>
+                        <label className="flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm"><input type="checkbox" checked={Boolean(portalEdit.lateFeeWaived)} onChange={(e) => updatePortalEdit({ lateFeeWaived: e.target.checked })} /> Waive fee</label>
+                        <label className="flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm"><input type="checkbox" checked={Boolean(portalEdit.previewEnabled)} onChange={(e) => updatePortalEdit({ previewEnabled: e.target.checked })} /> Preview enabled</label>
+                        <label className="flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm"><input type="checkbox" checked={Boolean(portalEdit.photoDownloadPermission)} onChange={(e) => updatePortalEdit({ photoDownloadPermission: e.target.checked })} /> Photo download permission</label>
+                        <label className="flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm"><input type="checkbox" checked={Boolean(portalEdit.videoDownloadPermission)} onChange={(e) => updatePortalEdit({ videoDownloadPermission: e.target.checked })} /> Video download permission</label>
+                        <label className="flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm"><input type="checkbox" checked={Boolean(portalEdit.documentDownloadPermission)} onChange={(e) => updatePortalEdit({ documentDownloadPermission: e.target.checked })} /> Document / RAW ZIP download permission</label>
+                        <label className="flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm"><input type="checkbox" checked={Boolean(portalEdit.driveLinkAccessEnabled)} onChange={(e) => updatePortalEdit({ driveLinkAccessEnabled: e.target.checked })} /> Google Drive link access after payment</label>
+                        <input value={portalEdit.finalDeliveryAt || ''} onChange={(e) => updatePortalEdit({ finalDeliveryAt: e.target.value })} type="datetime-local" className="rounded-xl border border-stone-300 bg-white px-3 py-2.5" />
+                        <input value={portalEdit.accessExpiryAt || ''} onChange={(e) => updatePortalEdit({ accessExpiryAt: e.target.value })} type="datetime-local" className="rounded-xl border border-stone-300 bg-white px-3 py-2.5" />
+                      </div>
+                      <textarea value={portalEdit.clientMessage || ''} onChange={(e) => updatePortalEdit({ clientMessage: e.target.value })} placeholder="Client-facing delivery message" className="mt-3 min-h-20 w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5" />
+                      <textarea value={portalEdit.clientNote || ''} onChange={(e) => updatePortalEdit({ clientNote: e.target.value })} placeholder="Client note" className="mt-3 min-h-16 w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5" />
+                      <textarea value={portalEdit.internalAdminNote || ''} onChange={(e) => updatePortalEdit({ internalAdminNote: e.target.value })} placeholder="Internal admin note" className="mt-3 min-h-16 w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5" />
+                      <div className="mt-3 flex gap-2"><button onClick={savePortalEdit} disabled={loading} className="rounded-xl bg-stone-950 px-4 py-2.5 text-sm font-bold text-white">Save changes</button><button onClick={() => setPortalEdit({})} className="rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-bold">Cancel</button></div>
+                    </div>
+                  )}
+
+                  {editingPortal?.id === portal.id && (
+                    <div className="mt-4 grid gap-3 rounded-2xl bg-stone-50 p-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]">
+                      <input value={settingsBkash} onChange={(e) => setSettingsBkash(e.target.value)} placeholder="bKash number" className="rounded-xl border border-stone-300 bg-white px-3 py-2.5" />
+                      <input value={settingsNagad} onChange={(e) => setSettingsNagad(e.target.value)} placeholder="Nagad number (optional)" className="rounded-xl border border-stone-300 bg-white px-3 py-2.5" />
+                      <input value={settingsDbbl} onChange={(e) => setSettingsDbbl(e.target.value)} placeholder="Dutch-Bangla account / number (optional)" className="rounded-xl border border-stone-300 bg-white px-3 py-2.5" />
+                      <input value={settingsRocket} onChange={(e) => setSettingsRocket(e.target.value)} placeholder="Rocket number (optional)" className="rounded-xl border border-stone-300 bg-white px-3 py-2.5" />
+                      <input type="datetime-local" value={settingsRetention} onChange={(e) => setSettingsRetention(e.target.value)} className="rounded-xl border border-stone-300 bg-white px-3 py-2.5" />
+                      <div className="flex gap-2">
+                        <button onClick={saveSettings} disabled={loading} className="rounded-xl bg-stone-950 px-4 py-2.5 text-sm font-bold text-white">Save</button>
+                        <button onClick={() => setEditingPortal(null)} className="rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-bold">Cancel</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            </div>
+          </div>}
+        </section>
+        )}
+
+        {adminSection === 'dashboard' && (
+        <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center gap-2">
+            <CalendarClock className="h-5 w-5 text-amber-700" />
+            <h2 className="text-xl font-semibold">Recent delivery audit</h2>
+          </div>
+          <div className="mt-4 space-y-2">
+            {(dashboard?.audit_logs || []).slice(0, 20).map((log) => (
+              <div key={log.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-stone-50 p-3 text-sm">
+                <div>
+                  <div className="font-semibold">{log.action.replaceAll('_', ' ')}</div>
+                  <div className="text-xs text-stone-500">{log.portal_id || 'System action'}</div>
+                </div>
+                <div className="text-stone-500">{fmt(log.created_at)}</div>
+              </div>
+            ))}
+            {(dashboard?.audit_logs || []).length === 0 && (
+              <div className="rounded-xl bg-stone-50 p-4 text-sm text-stone-500">Audit log entries will appear after admin actions.</div>
+            )}
+          </div>
+        </section>
+        )}
+      </div>
+      {paymentProofUrl && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4" onClick={() => setPaymentProofUrl('')}>
+          <div className="max-h-[92vh] w-full max-w-4xl overflow-auto rounded-2xl bg-white p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <strong>Private payment screenshot</strong>
+              <button type="button" onClick={() => setPaymentProofUrl('')} className="rounded-lg border px-3 py-1.5 text-sm font-semibold">Close</button>
+            </div>
+            <img src={paymentProofUrl} alt="Client payment proof" className="mx-auto max-h-[78vh] max-w-full rounded-lg object-contain" />
+            <p className="mt-2 text-xs text-stone-500">This temporary private link expires in 5 minutes.</p>
+          </div>
+        </div>
+      )}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4">
+          <section role="dialog" aria-modal="true" aria-labelledby="delete-client-heading" className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl bg-white p-6 shadow-xl">
+            <h2 id="delete-client-heading" className="text-xl font-bold">Delete Client Delivery</h2>
+            <p className="mt-3 font-semibold">{deleteTarget.client_name}</p>
+            <p className="text-sm text-stone-600">{deleteTarget.event_name || 'Client delivery'} · {(filesByPortal[deleteTarget.id] || []).length} attached file records</p>
+            <p className="mt-4 text-sm text-stone-700">This removes the client delivery from this list and deletes its attached file records. The previous client link will stop working. Original Google Drive files, bookings and payment history are preserved.</p>
+            <label htmlFor="delete-client-name" className="mt-5 block text-sm font-semibold">Type the exact client name to confirm</label>
+            <input id="delete-client-name" autoFocus value={deleteName} onChange={(e) => setDeleteName(e.target.value)} disabled={deleting} autoComplete="off" className="mt-2 w-full rounded-xl border border-stone-300 p-3" />
+            {deleteError && <p role="alert" className="mt-3 text-sm text-red-700">{deleteError}</p>}
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button type="button" disabled={deleting} onClick={() => setDeleteTarget(null)} className="rounded-xl border px-4 py-2 font-semibold">Cancel</button>
+              <button type="button" disabled={deleting || deleteName !== deleteTarget.client_name} onClick={confirmDeleteClient} className="rounded-xl bg-red-700 px-4 py-2 font-semibold text-white disabled:opacity-40">{deleting ? 'Deleting…' : 'Delete Client Delivery'}</button>
+            </div>
+          </section>
+        </div>
+      )}
+      <DriveDeliveryPickerModal
+        adminToken={token}
+        isOpen={Boolean(drivePickerPortalId)}
+        onClose={() => setDrivePickerPortalId('')}
+        onSelect={(item) => pickedDriveItem(drivePickerPortalId, item)}
+      />
+    </main>
+  );
+}

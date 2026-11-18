@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+.ramya-chat-widget-dock {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  max-width: calc(100vw - 32px);
+  font-family: inherit;
+}
+.ramya-chat-widget-dock button:focus-visible,
+.ramya-chat-widget-dock a:focus-visible {
+  outline: 3px solid #b28748;
+  outline-offset: 3px;
+}
+.ramya-chat-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 260px;
+  max-width: calc(100vw - 32px);
+  margin-bottom: 10px;
+  padding: 10px 8px 10px 14px;
+  border: 1px solid #d8d9c9;
+  border-radius: 16px;
+  background: #fffdf2;
+  color: #193e32;
+  box-shadow: 0 4px 18px #0001;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.ramya-chat-hint p { margin: 0; flex: 1; }
+.ramya-chat-hint button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  margin-top: -6px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #193e32;
+  font-size: 22px;
+  cursor: pointer;
+}
+/* Reserve space for the public mobile bottom navigation and safe area. */
+@media (max-width: 767px) {
+  .ramya-chat-widget-dock {
+    bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+  .ramya-chat-panel {
+    max-height: calc(100dvh - 164px - env(safe-area-inset-bottom));
+  }
+}
+
+
+/* Mobile controls for the photo-selection admin panel. */
+@media (max-width: 639px) {
+  .admin-header-actions {
+    width: 100%;
+    justify-content: stretch;
+    gap: 8px;
+  }
+
+  .admin-header-actions > div,
+  .admin-header-actions > button {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+  }
+
+  .admin-header-actions > div > button,
+  .admin-header-actions > button {
+    min-height: 44px;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .customer-gallery-card {
+    gap: 12px;
+    border-radius: 20px;
+  }
+
+  .customer-gallery-card > div:first-child {
+    gap: 10px;
+  }
+
+  .customer-gallery-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+    flex-shrink: 1;
+  }
+
+  .customer-gallery-actions button {
+    min-width: 0;
+    min-height: 52px;
+    padding: 7px 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    text-align: center;
+    line-height: 1.15;
+    white-space: normal;
+  }
+
+  .customer-gallery-actions button > span {
+    display: none;
+  }
+
+  .customer-gallery-actions button::after {
+    display: block;
+    max-width: 100%;
+    font-size: 10px;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+
+  .customer-gallery-actions button[title="Open customer view"]::after { content: "Open"; }
+  .customer-gallery-actions button[title="Copy direct customer link"]::after { content: "Copy link"; }
+  .customer-gallery-actions button[title="Share to WhatsApp or Messenger"]::after { content: "Share"; }
+  .customer-gallery-actions button[title="View selected photos, export filenames, or collect in Google Drive"]::after { content: "Selections"; }
+  .customer-gallery-actions button[title="Edit settings, deadline, limits"]::after { content: "Edit"; }
+  .customer-gallery-actions button[title="Lock Selection"]::after { content: "Lock"; }
+  .customer-gallery-actions button[title="Unlock Selection"]::after { content: "Unlock"; }
+  .customer-gallery-actions button[title="Reset selections"]::after { content: "Reset"; }
+  .customer-gallery-actions button[title="Disable Gallery"]::after { content: "Disable"; }
+  .customer-gallery-actions button[title="Enable Gallery"]::after { content: "Enable"; }
+  .customer-gallery-actions button[title="Delete gallery"]::after { content: "Delete"; }
+}

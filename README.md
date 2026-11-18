@@ -1,5 +1,3 @@
-# RamyaChobi Website Two
+# Apurba Roy / RC Foto
 
-Independent copy of the RamyaChobi website. Source repository: https://github.com/apurbabhaiya/Apurba-Roy
-
-Development setup and fixes will be tracked here. Do not store passwords, API secrets, or private customer data in Git.
+Working repository for the RC Foto client photo-selection application.
