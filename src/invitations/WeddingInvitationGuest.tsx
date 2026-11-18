@@ -51,7 +51,7 @@ export default function WeddingInvitationGuest() {
       <h1 className="mt-3 font-serif text-3xl font-semibold sm:text-4xl">You're Invited</h1>
       <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-stone-700">Tap the invitation to unfold a special message from {currentInvite.bride} and {currentInvite.groom}.</p>
       <WeddingInviteCard invite={invite}/>
-      <a href="#countdown" className="mb-4 inline-flex min-h-11 items-center rounded-full border border-amber-400 bg-white/70 px-5 py-3 text-sm font-bold text-amber-950">Save the Date ↓</a>
+      <button type="button" onClick={() => document.getElementById("countdown")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" })} className="mb-4 inline-flex min-h-11 items-center rounded-full border border-amber-400 bg-white/70 px-5 py-3 text-sm font-bold text-amber-950">Save the Date ↓</button>
       <div className="mt-2 rounded-3xl border border-white/80 bg-white/75 p-5 shadow-sm backdrop-blur-sm">
         <p className="font-serif text-xl font-semibold">{currentInvite.occasion}</p>
         <p className="mt-2 text-sm"><CalendarDays size={16} className="mr-2 inline text-amber-800"/>{readableDate(currentInvite.date)} · {readableTime(currentInvite.time)}</p>
