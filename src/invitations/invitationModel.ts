@@ -1,5 +1,7 @@
 export type InvitationTheme = 'emerald' | 'rose' | 'royal';
 
+export type WeddingFunction = { name: string; date: string; time: string; venue: string; dress: string };
+
 export type WeddingInvite = {
   v: 1;
   bride: string;
@@ -13,6 +15,11 @@ export type WeddingInvite = {
   message: string;
   photo: string;
   theme: InvitationTheme;
+  events?: WeddingFunction[];
+  photos?: string[];
+  rsvp?: string;
+  family?: string;
+  dress?: string;
 };
 
 export const EMPTY_INVITE: WeddingInvite = {
@@ -28,6 +35,11 @@ export const EMPTY_INVITE: WeddingInvite = {
   message: 'With love and blessings, we invite you to celebrate our special day.',
   photo: '',
   theme: 'emerald',
+  events: [],
+  photos: [],
+  rsvp: '',
+  family: '',
+  dress: '',
 };
 
 export const INVITE_THEMES: Record<InvitationTheme, { title: string; dark: string; accent: string; light: string; paper: string }> = {
@@ -50,12 +62,20 @@ export function normalizeInvite(value: unknown): WeddingInvite | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const data = value as Record<string, unknown>;
   if (data.v !== 1) return null;
+  const cleanText = (value: unknown, max: number): string => typeof value === 'string' ? value.trim().slice(0, max) : '';
+  const cleanDate = (value: unknown): string => { const s = cleanText(value, 10); return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s+'T00:00:00Z')) ? s : ''; };
+  const cleanTime = (value: unknown): string => { const s = cleanText(value, 5); return /^([01]\d|2[0-3]):[0-5]\d$/.test(s) ? s : ''; };
   const take = (key: keyof WeddingInvite, max: number): string => typeof data[key] === 'string' ? String(data[key]).trim().slice(0, max) : '';
   const theme: InvitationTheme = data.theme === 'rose' || data.theme === 'royal' ? data.theme : 'emerald';
   const date = take('date', 10);
   const time = take('time', 5);
   if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(new Date(date + 'T00:00:00Z').getTime()))) return null;
   if (time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return null;
+  const events: WeddingFunction[] = (Array.isArray(data.events) ? data.events : []).slice(0, 6).map(item => ({
+    name: cleanText(item?.name, 80), date: cleanDate(item?.date), time: cleanTime(item?.time),
+    venue: cleanText(item?.venue, 120), dress: cleanText(item?.dress, 70),
+  })).filter(e => e.name && e.date);
+  const photos = (Array.isArray(data.photos) ? data.photos : []).slice(0, 5).map(url => safeInvitePhoto(cleanText(url, 600))).filter(Boolean);
   const candidate: WeddingInvite = {
     v: 1,
     bride: take('bride', 90),
@@ -69,13 +89,18 @@ export function normalizeInvite(value: unknown): WeddingInvite | null {
     message: take('message', 280),
     photo: safeInvitePhoto(take('photo', 600)),
     theme,
+    events,
+    photos,
+    rsvp: cleanText(data.rsvp, 30).replace(/[^+\d]/g, ''),
+    family: cleanText(data.family, 120),
+    dress: cleanText(data.dress, 70),
   };
   return candidate;
 }
 
 export function encodeInvite(value: WeddingInvite): string {
   const encoded = new TextEncoder().encode(JSON.stringify(value));
-  if (encoded.length > 3200) throw new Error('Invitation text is too long. Shorten the notes or photo URL.');
+  if (encoded.length > 6200) throw new Error('Invitation text is too long. Shorten the notes or photo URL.');
   const binary = Array.from(encoded, byte => String.fromCharCode(byte)).join('');
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
@@ -83,7 +108,7 @@ export function encodeInvite(value: WeddingInvite): string {
 export function decodeInvite(hash: string): WeddingInvite | null {
   try {
     const raw = hash.startsWith('#') ? hash.slice(1) : hash;
-    if (!raw.startsWith('i=') || raw.length > 5200) return null;
+    if (!raw.startsWith('i=') || raw.length > 9000) return null;
     const payload = raw.slice(2);
     if (!/^[A-Za-z0-9_-]+$/.test(payload)) return null;
     const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
