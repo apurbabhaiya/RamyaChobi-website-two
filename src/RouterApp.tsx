@@ -13,6 +13,7 @@ import PortfolioPage from "./home/PortfolioPage";
 import AlbumGalleryPage from "./home/AlbumGalleryPage";
 import FacebookAccessGate from "./home/FacebookAccessGate";
 import SpinResultSubmission from "./home/SpinResultSubmission";
+import WeddingMembershipPage from "./home/WeddingMembershipPage";
 
 const withChat = (page: React.ReactNode) => /^(\/booking\/admin|\/delivery-admin|\/studio)(\/|$)/.test(window.location.pathname) ? <>{page}</> : <>{page}<RamyaChatWidget /></>;
 
@@ -20,7 +21,7 @@ export default function RouterApp() {
   const path = window.location.pathname;
 
   useEffect(() => {
-    const isPublicPage = path === "/" || path === "/about" || path === "/packages" || path === "/portfolio" || path === "/stories" || path === "/blog";
+    const isPublicPage = path === "/" || path === "/about" || path === "/packages" || path === "/portfolio" || path === "/stories" || path === "/blog" || path === "/wedding-membership";
     let robots = document.querySelector('meta[name="robots"]') as HTMLMetaElement | null;
     if (!robots) {
       robots = document.createElement("meta");
@@ -39,6 +40,8 @@ export default function RouterApp() {
           ? "About · RamyaChobi"
           : path === "/packages"
             ? "Packages · RamyaChobi"
+            : path === "/wedding-membership"
+              ? "Wedding Package – 5% Membership Discount | RamyaChobi"
             : path === "/portfolio"
               ? "Portfolio · RamyaChobi"
               : path === "/stories" || path === "/blog"
@@ -65,6 +68,7 @@ export default function RouterApp() {
   if (path === "/spin-result") return <SpinResultSubmission />;
   if (path === "/about") return (<RamyaChobiAbout />);
   if (path === "/packages") return (<RamyaChobiPackages />);
+  if (path === "/wedding-membership") return <WeddingMembershipPage />;
   if (path === "/portfolio") return (<PortfolioPage />);
   if (path === "/stories" || path === "/blog") return (<PortfolioPage featuredOnly={false} />);
   if (path === "/face-search" || path === "/client-gallery") return <FacebookAccessGate><AlbumGalleryPage /></FacebookAccessGate>;
