@@ -36,7 +36,7 @@ export default function InvitationStudio({ bookings, events }: { bookings: Invit
     const b = activeBookings.find(item => item.id === id);
     const matching = (Array.isArray(events) ? events : []).filter(e => e.booking_id === id);
     setEventId(matching[0]?.id || '');
-    setInvite(prev => ({ ...prev, bride: b?.bride_name || '', groom: b?.groom_name || '', occasion: matching[0]?.event_name || 'Wedding Celebration', date: matching[0]?.event_date || '', time: String(matching[0]?.start_time || '').slice(0,5), venue: matching[0]?.venue || '', address: matching[0]?.location || '', guest: '' }));
+    setInvite(prev => ({ ...prev, bride: b?.bride_name || '', groom: b?.groom_name || '', occasion: matching[0]?.event_name || 'Wedding Celebration', date: matching[0]?.event_date || '', time: String(matching[0]?.start_time || '').slice(0,5), venue: matching[0]?.venue || '', address: matching[0]?.location || '', guest: '', events: matching.map(e=>({name:e.event_name||'',date:e.event_date||'',time:String(e.start_time||'').slice(0,5),venue:e.venue||'',dress:''})).filter(e=>e.name && e.date).slice(0,6) }));
     setShareUrl('');
     setNotice('');
   }
@@ -127,6 +127,34 @@ export default function InvitationStudio({ bookings, events }: { bookings: Invit
               {field('Venue', 'venue', 'text', 'Wedding venue')}
               {field('Location or full address', 'address', 'text', 'City, road, landmark')}
               <div className="sm:col-span-2">{field('Couple photo — Public HTTPS image URL (optional)', 'photo', 'url', 'https://example.com/your-photo.jpg')}</div>
+            </div>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              {field('Dress code (optional)', 'dress', 'text', 'Traditional / Festive')}
+              {field('Family blessings / hosted by (optional)', 'family', 'text', 'With love from both families')}
+              {field('RSVP WhatsApp number (optional)', 'rsvp', 'tel', '+8801XXXXXXXXX')}
+            </div>
+            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <h4 className="font-bold text-stone-900">Functions & Celebration Timeline</h4>
+              <p className="mt-1 text-xs text-stone-600">Booking-এর Event থেকে স্বয়ংক্রিয়ভাবে লোড হয়। চাইলে Holud, Mehndi, Wedding ও Reception এডিট করুন। পরিবর্তন Booking-এ সেভ হবে না।</p>
+              {(invite.events||[]).map((event,index) => <div key={index} className="mt-3 rounded-xl border border-amber-200 bg-white p-3">
+                <div className="mb-2 flex justify-between gap-2"><strong className="text-sm">Event {index+1}</strong><button type="button" className="text-sm font-bold text-red-800" onClick={()=>setField('events',(invite.events||[]).filter((_,i)=>i!==index))}>Remove</button></div>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['name','date','time','venue','dress'] as const).map(key => <label key={key} className={'text-xs font-semibold '+(key==='venue'?'col-span-2':'')}>{key}
+                    <input aria-label={'Event '+(index+1)+' '+key} value={event[key]} type={key==='date'?'date':key==='time'?'time':'text'} maxLength={120} onChange={e => setField('events',(invite.events||[]).map((entry,i)=>i===index?{...entry,[key]:e.target.value}:entry))} className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2.5 text-sm"/>
+                  </label>)}
+                </div>
+              </div>)}
+              <button type="button" disabled={(invite.events||[]).length>=6} onClick={()=>setField('events',[...(invite.events||[]),{name:'',date:'',time:'',venue:'',dress:''}])} className="mt-3 min-h-11 rounded-xl border border-emerald-700 px-4 text-sm font-bold text-emerald-900 disabled:opacity-40">+ Add Event (up to 6)</button>
+            </div>
+            <div className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-4">
+              <h4 className="font-bold text-stone-900">Couple Photo Album</h4>
+              <p className="mt-1 text-xs text-stone-600">মূল ছবি ছাড়া আরও ৩টি Public HTTPS image URL দিতে পারবেন। ছবিগুলো অতিথিদের জন্য দৃশ্যমান হবে।</p>
+              {(invite.photos||[]).map((url,index)=><label key={index} className="mt-3 flex items-center gap-2 text-xs font-semibold">
+                <span className="shrink-0">Photo {index+2}</span>
+                <input type="url" value={url} onChange={e=>setField('photos',(invite.photos||[]).map((item,i)=>i===index?e.target.value:item))} placeholder="https://..." className="min-w-0 flex-1 rounded-lg border border-stone-300 px-3 py-2.5 text-sm"/>
+                <button type="button" className="min-h-11 px-2 text-red-800" onClick={()=>setField('photos',(invite.photos||[]).filter((_,i)=>i!==index))}>✕</button>
+              </label>)}
+              <button type="button" disabled={(invite.photos||[]).length>=3} onClick={()=>setField('photos',[...(invite.photos||[]),''])} className="mt-3 min-h-11 rounded-xl border border-emerald-700 px-4 text-sm font-bold text-emerald-900 disabled:opacity-40">+ Add Photo URL (up to 3)</button>
             </div>
             <label className="mt-4 block text-sm font-semibold">Personal Message
               <textarea maxLength={280} rows={3} value={invite.message} onChange={e => setField('message', e.target.value)} className="mt-1 w-full rounded-xl border border-stone-300 bg-white px-3.5 py-3 text-sm font-normal" placeholder="You're invited to celebrate with us…"/>
