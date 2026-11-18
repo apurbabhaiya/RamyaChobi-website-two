@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { CalendarDays, HeartHandshake, MapPin, Share2 } from 'lucide-react';
 import WeddingInviteCard from './WeddingInviteCard';
 import InvitationExperience from './InvitationExperience';
-import { decodeInvite, readableDate, readableTime, type WeddingInvite } from './invitationModel';
+import { decodeInvite, downloadWeddingCalendar, readableDate, readableTime, type WeddingInvite } from './invitationModel';
 import './invitation.css';
 
 export default function WeddingInvitationGuest() {
@@ -56,6 +56,7 @@ export default function WeddingInvitationGuest() {
         {venueQuery && <p className="mt-2 text-sm"><MapPin size={16} className="mr-2 inline text-amber-800"/>{venueQuery}</p>}
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           {dateValid && <a href={calendarLink()} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-bold"><CalendarDays size={16}/> Add to calendar</a>}
+          {dateValid && <button type="button" onClick={() => downloadWeddingCalendar(currentInvite)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-bold"><CalendarDays size={16}/> All Events (.ics)</button>}
           {venueQuery && <a href={'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(venueQuery)} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#193c32] px-4 py-2 text-sm font-bold text-white"><MapPin size={16}/> Directions</a>}
           {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && <button type="button" onClick={() => {void navigator.share({title:'Wedding Invitation',text:currentInvite.bride+' & '+currentInvite.groom,url:window.location.href}).catch(()=>{});}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-bold"><Share2 size={16}/> Share</button>}
         </div>
