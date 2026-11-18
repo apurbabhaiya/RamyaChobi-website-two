@@ -25,20 +25,34 @@ export function InvitationBrandPromotion({ compact = false }: { compact?: boolea
 }
 
 /**
- * Reserved Adsterra Native Banner placement on the *public marketing page*.
- * It intentionally does not load unknown third-party code. The publisher's
- * approved, exact script/container pair must be configured and reviewed first.
- * Keep advertising code off guest invitations and all admin routes.
+ * This URL is an Adsterra Smartlink supplied by the site owner, not a native
+ * banner script. It navigates only after an explicit click and exposes no
+ * invitation fragment, booking data, admin token or customer information.
+ *
+ * Ads are shown only on the public marketing landing page; no third-party
+ * scripts are loaded in personalized wedding guest pages.
  */
+const ADSTERRA_DIRECT_LINK = 'https://auctionr.org/4/f1ca6bf0dd63f07aa3a116031c5ee6ad';
+
 export function WeddingAdsterraSlot() {
   return (
-    <aside aria-label="Advertising information" className="rounded-2xl border border-dashed border-amber-300 bg-white/75 p-5 text-center text-stone-700">
-      <div className="text-[11px] font-bold uppercase tracking-[.17em] text-stone-500">Advertising placement</div>
-      <div id="ramyachobi-adsterra-native-slot" data-ad-provider="adsterra" data-ad-status="not-configured" className="mt-3 flex min-h-32 flex-col items-center justify-center gap-2 rounded-xl bg-amber-50 p-3">
-        <span className="font-serif text-lg text-emerald-900">Partner with RamyaChobi</span>
-        <p className="text-xs leading-5">A small, clearly labeled native banner can appear here after publisher approval.</p>
+    <aside aria-label="Sponsored external advertising" className="overflow-hidden rounded-2xl border border-amber-200 bg-white/90 p-5 text-stone-800 shadow-sm">
+      <p className="text-[11px] font-extrabold uppercase tracking-[.17em] text-stone-500">Sponsored · External Ad</p>
+      <div className="mt-3 rounded-xl border border-amber-100 bg-[#fcf5e6] p-4 text-left">
+        <span className="text-xs font-semibold uppercase tracking-[.16em] text-amber-900">Advertisement</span>
+        <h3 className="mt-2 font-serif text-xl text-[#193c32]">Explore Sponsored Offers</h3>
+        <p className="mt-2 text-sm leading-6 text-stone-700">Optional offers from a third-party advertiser. Destination content can vary by visitor.</p>
+        <a
+          href={ADSTERRA_DIRECT_LINK}
+          target="_blank"
+          rel="sponsored nofollow noopener noreferrer"
+          referrerPolicy="no-referrer"
+          className="mt-4 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#193c32] px-4 py-3 text-center text-sm font-bold text-white hover:bg-emerald-900 focus-visible:outline-4 focus-visible:outline-amber-600"
+        >
+          Visit Sponsored Link <ExternalLink size={16} aria-hidden="true" />
+        </a>
       </div>
-      <p className="mt-3 text-xs leading-5 text-stone-600">No third-party ad trackers are loaded in this preview. Adsterra integration requires an approved publisher code and a public, compliant hosting setup.</p>
+      <p className="mt-3 text-xs leading-5 text-stone-600">You are leaving RamyaChobi. This link is an Adsterra Direct Link, not a RamyaChobi service or booking. No ad auto-redirects or pop-ups are used.</p>
     </aside>
   );
 }
