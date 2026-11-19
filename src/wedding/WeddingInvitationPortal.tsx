@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { supabase } from "../services/supabase";
+import { supabase, SUPABASE_URL } from "../services/supabase";
 import {
   CalendarDays, Camera, Check, ChevronRight, Copy, ExternalLink, Eye, Heart,
   ImagePlus, Link2, LogIn, LogOut, MapPin, Plus, RefreshCw, Save, Search,
@@ -154,6 +154,7 @@ function AdminWorkspace(){
   const [query,setQuery]=useState("");
   const [notice,setNotice]=useState("");
   const [loading,setLoading]=useState(false);
+  const [uploading,setUploading]=useState("");
   const [client,setClient]=useState<any>(null);
   const [invitation,setInvitation]=useState<any>(null);
   const [event,setEvent]=useState<any>(null);
@@ -177,6 +178,38 @@ function AdminWorkspace(){
   const save=async(action:string,value:any)=>{
     try{await call(action,value);setNotice("Saved successfully.");await refresh();setClient(null);setInvitation(null);setEvent(null);setGuest(null);}
     catch(e:any){setNotice(e?.message||"Could not save.");}
+  };
+  const uploadPhotos=async(kind:"cover"|"couple"|"gallery",fileList:FileList|null)=>{
+    if(!fileList?.length||!invitation)return;
+    const allFiles=Array.from(fileList);
+    const files=kind==="gallery"?allFiles:allFiles.slice(0,1);
+    const currentGallery=(invitation.gallery_images||[]) as string[];
+    if(kind==="gallery"&&currentGallery.length+files.length>30){setNotice("A maximum of 30 gallery photos is allowed.");return;}
+    setUploading(kind);setNotice("");
+    try{
+      const form=new FormData();
+      form.append("action","upload");
+      form.append("invitation_id",invitation.id||"draft");
+      form.append("kind",kind);
+      files.forEach(file=>form.append("files",file));
+      const response=await fetch(SUPABASE_URL+"/functions/v1/wedding-invitation-media",{
+        method:"POST",
+        headers:{"x-admin-token":auth.token},
+        body:form
+      });
+      const result=await response.json();
+      if(!response.ok||!result?.success)throw new Error(result?.error||"Photo upload failed.");
+      const urls=(result.uploaded||[]).map((item:any)=>item.url).filter(Boolean) as string[];
+      if(!urls.length)throw new Error("No image was uploaded.");
+      setInvitation((current:any)=>{
+        if(!current)return current;
+        if(kind==="cover")return {...current,cover_image_url:urls[0]};
+        if(kind==="couple")return {...current,couple_photo_url:urls[0]};
+        return {...current,gallery_images:[...(current.gallery_images||[]),...urls].slice(0,30)};
+      });
+      setNotice((kind==="cover"?"Cover photo":kind==="couple"?"Couple photo":urls.length+" gallery photo(s)")+" uploaded. Click Save invitation to save the changes.");
+    }catch(e:any){setNotice(e?.message||"Could not upload photo(s).");}
+    finally{setUploading("");}
   };
   const openNewClient=()=>setClient({...blankClient});
   const openClient=(c:any)=>setClient({...c});
@@ -226,9 +259,10 @@ function AdminWorkspace(){
           <label className="text-sm">Invitation title (English)<input className={input+" mt-1"} value={invitation.title} onChange={e=>setInvitation({...invitation,title:e.target.value})}/></label><label className="text-sm">Invitation title (বাংলা)<input className={input+" mt-1"} value={invitation.title_bn||""} onChange={e=>setInvitation({...invitation,title_bn:e.target.value})}/></label><label className="text-sm">URL slug<input className={input+" mt-1"} value={invitation.slug} onChange={e=>setInvitation({...invitation,slug:e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"-")})}/></label>
           <label className="text-sm">Selected template<select className={input+" mt-1"} value={invitation.template_key||"classic-ivory"} onChange={e=>{const t=invitationTemplates.find(x=>x.key===e.target.value);setInvitation({...invitation,template_key:e.target.value,theme:t?.theme||invitation.theme})}}><option value="custom">Custom Design</option>{invitationTemplates.map(t=><option key={t.key} value={t.key}>{t.name}</option>)}</select></label><label className="text-sm">Theme<select className={input+" mt-1"} value={invitation.theme} onChange={e=>setInvitation({...invitation,theme:e.target.value})}>{Object.entries(themeLabel).map(([k,v])=><option value={k} key={k}>{v}</option>)}</select></label><label className="text-sm">Status<select className={input+" mt-1"} value={invitation.status} onChange={e=>setInvitation({...invitation,status:e.target.value})}><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option></select></label>
           <label className="text-sm sm:col-span-2">Welcome message (English)<textarea rows={3} className={input+" mt-1"} value={invitation.welcome_message} onChange={e=>setInvitation({...invitation,welcome_message:e.target.value})}/></label><label className="text-sm sm:col-span-2">Welcome message (বাংলা)<textarea rows={3} className={input+" mt-1"} value={invitation.welcome_message_bn||""} onChange={e=>setInvitation({...invitation,welcome_message_bn:e.target.value})}/></label>
-          <label className="text-sm sm:col-span-2">Cover image URL<input className={input+" mt-1"} placeholder="https://…" value={invitation.cover_image_url} onChange={e=>setInvitation({...invitation,cover_image_url:e.target.value})}/></label><label className="text-sm sm:col-span-2">Couple photo URL<input className={input+" mt-1"} placeholder="https://…" value={invitation.couple_photo_url} onChange={e=>setInvitation({...invitation,couple_photo_url:e.target.value})}/></label>
+          <div className="sm:col-span-2 rounded-xl border border-stone-200 bg-stone-50 p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">Cover Photo</p><p className="text-xs text-stone-500">Main invitation banner · JPG, PNG, WEBP or AVIF · Max 15 MB</p></div><label className={btn+" cursor-pointer bg-[#4b1525] text-white"}><ImagePlus size={16}/>{uploading==="cover"?"Uploading…":"Upload Cover Photo"}<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="hidden" disabled={!!uploading} onChange={e=>{void uploadPhotos("cover",e.currentTarget.files);e.currentTarget.value="";}}/></label></div>{invitation.cover_image_url&&<img src={invitation.cover_image_url} alt="Cover photo preview" className="mt-3 max-h-56 w-full rounded-lg object-cover"/>}<label className="mt-3 block text-xs text-stone-500">Or paste an image URL<input className={input+" mt-1"} placeholder="https://…" value={invitation.cover_image_url} onChange={e=>setInvitation({...invitation,cover_image_url:e.target.value})}/></label></div>
+          <div className="sm:col-span-2 rounded-xl border border-stone-200 bg-stone-50 p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">Couple Photo</p><p className="text-xs text-stone-500">Main photo of the bride and groom · Max 15 MB</p></div><label className={btn+" cursor-pointer bg-[#4b1525] text-white"}><ImagePlus size={16}/>{uploading==="couple"?"Uploading…":"Upload Couple Photo"}<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="hidden" disabled={!!uploading} onChange={e=>{void uploadPhotos("couple",e.currentTarget.files);e.currentTarget.value="";}}/></label></div>{invitation.couple_photo_url&&<img src={invitation.couple_photo_url} alt="Couple photo preview" className="mt-3 max-h-64 w-full rounded-lg object-cover"/>}<label className="mt-3 block text-xs text-stone-500">Or paste an image URL<input className={input+" mt-1"} placeholder="https://…" value={invitation.couple_photo_url} onChange={e=>setInvitation({...invitation,couple_photo_url:e.target.value})}/></label></div>
           <label className="text-sm">RSVP deadline<input type="date" className={input+" mt-1"} value={invitation.rsvp_deadline||""} onChange={e=>setInvitation({...invitation,rsvp_deadline:e.target.value})}/></label><label className="text-sm">Dress code (English)<input className={input+" mt-1"} value={invitation.dress_code} onChange={e=>setInvitation({...invitation,dress_code:e.target.value})}/></label><label className="text-sm">Dress code (বাংলা)<input className={input+" mt-1"} value={invitation.dress_code_bn||""} onChange={e=>setInvitation({...invitation,dress_code_bn:e.target.value})}/></label>
-          <label className="text-sm sm:col-span-2">Gallery image URLs (one per line)<textarea rows={3} className={input+" mt-1"} value={(invitation.gallery_images||[]).join("\n")} onChange={e=>setInvitation({...invitation,gallery_images:e.target.value.split("\n").map((v:string)=>v.trim()).filter(Boolean).slice(0,30)})}/></label>
+          <div className="sm:col-span-2 rounded-xl border border-stone-200 bg-stone-50 p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">Gallery Photos</p><p className="text-xs text-stone-500">Upload multiple photos together · Up to 30 photos total · Max 15 MB each</p></div><label className={btn+" cursor-pointer bg-[#4b1525] text-white"}><ImagePlus size={16}/>{uploading==="gallery"?"Uploading…":"Upload Gallery Photos"}<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple className="hidden" disabled={!!uploading} onChange={e=>{void uploadPhotos("gallery",e.currentTarget.files);e.currentTarget.value="";}}/></label></div>{(invitation.gallery_images||[]).length>0&&<div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">{invitation.gallery_images.map((url:string,index:number)=><div key={url+index} className="overflow-hidden rounded-lg border border-stone-200 bg-white"><img src={url} alt={"Gallery preview "+(index+1)} className="aspect-[3/4] w-full object-cover"/><p className="p-2 text-xs text-stone-500">Photo {index+1}</p></div>)}</div>}<label className="mt-3 block text-xs text-stone-500">Or paste image URLs (one per line)<textarea rows={3} className={input+" mt-1"} value={(invitation.gallery_images||[]).join("\n")} onChange={e=>setInvitation({...invitation,gallery_images:e.target.value.split("\n").map((v:string)=>v.trim()).filter(Boolean).slice(0,30)})}/></label></div>
           <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={invitation.show_countdown} onChange={e=>setInvitation({...invitation,show_countdown:e.target.checked})}/>Show save-the-date section</label>
         </div><div className="mt-4 flex flex-wrap gap-2"><button onClick={()=>void save("save_invitation",invitation)} className={btn+" bg-stone-900 text-white"}><Save size={16}/>Save invitation</button>{invitation.id&&<button onClick={()=>void copy(publicUrl(invitation),"invite")} className={btn+" border border-stone-200"}><Copy size={15}/>{copied==="invite"?"Copied":"Copy guest link"}</button>}</div>
         {invitation.id&&<div className="mt-6 border-t border-stone-100 pt-5"><div className="flex flex-wrap justify-between gap-2"><h4 className="font-serif text-lg">Event schedule</h4><button onClick={()=>setEvent({...blankEvent,invitation_id:invitation.id})} className={btn+" border border-stone-200"}><Plus size={15}/>Add event</button></div>{eventsFor(invitation.id).map((e:any)=><div key={e.id} className="mt-2 flex items-center justify-between gap-2 rounded-xl bg-stone-50 p-3"><div><p className="font-semibold">{e.title}</p><p className="text-xs text-stone-500">{moneylessDate(e.event_date)} · {e.venue}</p></div><button onClick={()=>setEvent({...e})} className="text-sm underline">Edit</button></div>)}</div>}
