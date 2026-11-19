@@ -374,7 +374,7 @@ begin
           sort_order = coalesce((p_payload->>'sort_order')::integer, 0),
           updated_at = now()
       where id = v_id
-      returning * into v_booking;
+      returning id into v_id;
       if not found then raise exception 'Event was not found'; end if;
       return jsonb_build_object('event_id', v_id);
     else
