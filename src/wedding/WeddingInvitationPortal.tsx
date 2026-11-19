@@ -51,6 +51,44 @@ function useAdminToken() {
   return {token,ready,code,setCode,busy,error,login,logout};
 }
 
+function eventTargetTimestamp(event:any):number|null{
+  if(!event?.event_date)return null;
+  const date=String(event.event_date).slice(0,10),time=String(event.start_time||"00:00:00").slice(0,8);
+  const [year,month,day]=date.split("-").map(Number),[hour,minute,second]=time.split(":").map(Number);
+  if(!year||!month||!day)return null;
+  const wanted=Date.UTC(year,month-1,day,hour||0,minute||0,second||0);
+  const zone=event.time_zone||event.timezone||"Asia/Dhaka";
+  try{
+    const formatter=new Intl.DateTimeFormat("en-GB",{timeZone:zone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"});
+    let guess=wanted;
+    for(let n=0;n<3;n++){
+      const parts=Object.fromEntries(formatter.formatToParts(new Date(guess)).filter(p=>p.type!=="literal").map(p=>[p.type,p.value]));
+      const represented=Date.UTC(Number(parts.year),Number(parts.month)-1,Number(parts.day),Number(parts.hour),Number(parts.minute),Number(parts.second));
+      const adjustment=wanted-represented;
+      guess+=adjustment;
+      if(adjustment===0)break;
+    }
+    return guess;
+  }catch{
+    return Date.parse(date+"T"+time+"+06:00");
+  }
+}
+function LiveWeddingCountdown({events}:{events:any[]}){
+  const [now,setNow]=useState(()=>Date.now());
+  useEffect(()=>{const timer=window.setInterval(()=>setNow(Date.now()),1000);return()=>window.clearInterval(timer)},[]);
+  const scheduled=(events||[]).map(event=>({event,target:eventTargetTimestamp(event)})).filter(x=>x.target!==null).sort((a,b)=>(a.target as number)-(b.target as number));
+  const next=scheduled.find(x=>(x.target as number)>now)||scheduled[scheduled.length-1];
+  if(!next)return null;
+  const remaining=Math.max(0,(next.target as number)-now);
+  const units=[{label:"Days",value:Math.floor(remaining/86400000)},{label:"Hours",value:Math.floor(remaining%86400000/3600000)},{label:"Minutes",value:Math.floor(remaining%3600000/60000)},{label:"Seconds",value:Math.floor(remaining%60000/1000)}];
+  const event=next.event;
+  return <div className="mt-5 rounded-2xl border border-[#b69a64]/40 bg-gradient-to-br from-[#fffdf8] via-[#f8f0df] to-[#ead9bb] p-4 text-[#5a4527] shadow-lg shadow-black/5 sm:p-6" aria-live="off">
+    <p className="text-center text-[10px] font-semibold uppercase tracking-[.28em] text-[#8b6b35]">Counting down to the celebration</p>
+    <h3 className="mt-2 text-center font-serif text-xl sm:text-2xl">{event.title||"Wedding Celebration"}</h3>
+    <p className="mt-1 text-center text-xs text-stone-600">{moneylessDate(event.event_date)}{event.start_time?" · "+String(event.start_time).slice(0,5):""}</p>
+    {remaining===0?<p className="mt-5 text-center font-serif text-xl">The celebration day has arrived! ♥</p>:<div className="mt-5 grid grid-cols-4 gap-2 sm:gap-3">{units.map(unit=><div key={unit.label} className="rounded-xl border border-[#b69a64]/30 bg-white/80 px-1 py-3 text-center shadow-sm sm:py-4"><p className="font-serif text-2xl tabular-nums sm:text-4xl">{String(unit.value).padStart(2,"0")}</p><p className="mt-1 text-[9px] font-semibold uppercase tracking-[.12em] text-stone-500 sm:text-[10px]">{unit.label}</p></div>)}</div>}
+  </div>;
+}
 function InvitationPublic({slug}:{slug:string}) {
   const [guestToken,setGuestToken] = useState("");
   const [language,setLanguage] = useState<"both"|"en"|"bn">("both");
@@ -166,7 +204,7 @@ function InvitationPublic({slug}:{slug:string}) {
           {language!=="bn"&&<p className="mt-6 font-serif text-xl sm:text-2xl">{i.title}</p>}{language!=="en"&&<p className="mt-2 font-serif text-xl sm:text-2xl">{i.title_bn||"বিবাহের আমন্ত্রণ"}</p>}
           {language!=="bn"&&<p className="mx-auto mt-5 max-w-xl text-sm leading-7 opacity-80">{i.welcome_message}</p>}{language!=="en"&&<p className="mx-auto mt-3 max-w-xl text-sm leading-7 opacity-80">{i.welcome_message_bn||"পরিবারের আশীর্বাদে আমাদের বিশেষ দিনে আপনাকে সাদর আমন্ত্রণ জানাই।"}</p>}
           {i.couple_photo_url&&<img src={i.couple_photo_url} alt="The couple" className="mx-auto mt-8 max-h-[440px] w-full rounded-2xl object-cover shadow-xl"/>}
-          {i.show_countdown&&data.events?.[0]&&<div className="mt-8"><p className="text-xs uppercase tracking-[.25em] opacity-70">Save the date</p><p className="mt-2 font-serif text-2xl">{moneylessDate(data.events[0].event_date)}</p></div>}
+          {i.show_countdown&&data.events?.length>0&&<LiveWeddingCountdown events={data.events}/>}
         </div>
       </div>
       <section className="py-12">
@@ -346,7 +384,7 @@ function AdminWorkspace(){
           <div className="sm:col-span-2 rounded-xl border border-[#b69a64]/40 bg-[#fffdf8] p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="flex items-center gap-2 font-semibold text-[#5a4527]"><Music2 size={17}/>Wedding Background Music</p><p className="mt-1 text-xs text-stone-500">One soundtrack for this invitation · MP3 or M4A · Maximum 5 MB. A new upload replaces the previous track.</p></div><label className={btn+" cursor-pointer bg-[#80663c] text-white"}><Music2 size={16}/>{uploading==="music"?"Uploading…":invitation.music_url?"Replace song":"Upload song"}<input type="file" accept=".mp3,.m4a,audio/mpeg,audio/mp4" className="hidden" disabled={!!uploading||!invitation.id} onChange={e=>{void uploadPhotos("music",e.currentTarget.files);e.currentTarget.value="";}}/></label></div>{!invitation.id&&<p className="mt-2 text-xs text-amber-800">Save the invitation first, then upload its music.</p>}{invitation.music_url&&<div className="mt-3 rounded-lg bg-white p-3"><audio controls preload="none" src={invitation.music_url} className="w-full"/><button type="button" onClick={async()=>{if(!invitation.music_storage_path){setNotice("This song uses an external URL and cannot be removed from storage here.");return;}try{const form=new FormData();form.append("action","delete");form.append("path",invitation.music_storage_path);const response=await fetch(SUPABASE_URL+"/functions/v1/wedding-invitation-media",{method:"POST",headers:{"x-admin-token":auth.token},body:form});const result=await response.json();if(!response.ok)throw new Error(result?.error||"Could not remove music.");setInvitation({...invitation,music_url:"",music_storage_path:""});setNotice("Wedding music removed. Save invitation to confirm.");}catch(e:any){setNotice(e?.message||"Could not remove music.");}}} className="mt-2 text-xs font-semibold text-red-700 underline">Remove song</button></div>}</div>
           <label className="text-sm">RSVP deadline<input type="date" className={input+" mt-1"} value={invitation.rsvp_deadline||""} onChange={e=>setInvitation({...invitation,rsvp_deadline:e.target.value})}/></label><label className="text-sm">Dress code (English)<input className={input+" mt-1"} value={invitation.dress_code} onChange={e=>setInvitation({...invitation,dress_code:e.target.value})}/></label><label className="text-sm">Dress code (বাংলা)<input className={input+" mt-1"} value={invitation.dress_code_bn||""} onChange={e=>setInvitation({...invitation,dress_code_bn:e.target.value})}/></label>
           <div className="sm:col-span-2 rounded-xl border border-stone-200 bg-stone-50 p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">Gallery Photos</p><p className="text-xs text-stone-500">Upload multiple photos together · Up to 30 photos total · Max 15 MB each</p></div><label className={btn+" cursor-pointer bg-[#4b1525] text-white"}><ImagePlus size={16}/>{uploading==="gallery"?"Uploading…":"Upload Gallery Photos"}<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple className="hidden" disabled={!!uploading} onChange={e=>{void uploadPhotos("gallery",e.currentTarget.files);e.currentTarget.value="";}}/></label></div>{(invitation.gallery_images||[]).length>0&&<div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">{invitation.gallery_images.map((url:string,index:number)=><div key={url+index} className="overflow-hidden rounded-lg border border-stone-200 bg-white"><img src={url} alt={"Gallery preview "+(index+1)} className="aspect-[3/4] w-full object-cover"/><p className="p-2 text-xs text-stone-500">Photo {index+1}</p></div>)}</div>}<label className="mt-3 block text-xs text-stone-500">Or paste image URLs (one per line)<textarea rows={3} className={input+" mt-1"} value={(invitation.gallery_images||[]).join("\n")} onChange={e=>setInvitation({...invitation,gallery_images:e.target.value.split("\n").map((v:string)=>v.trim()).filter(Boolean).slice(0,30)})}/></label></div>
-          <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={invitation.show_countdown} onChange={e=>setInvitation({...invitation,show_countdown:e.target.checked})}/>Show save-the-date section</label>
+          <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={invitation.show_countdown} onChange={e=>setInvitation({...invitation,show_countdown:e.target.checked})}/>Show live wedding countdown timer</label>
         </div><div className="mt-4 flex flex-wrap gap-2"><button onClick={()=>void save("save_invitation",invitation)} className={btn+" bg-stone-900 text-white"}><Save size={16}/>Save invitation</button>{invitation.id&&<button onClick={()=>void copy(publicUrl(invitation),"invite")} className={btn+" border border-stone-200"}><Copy size={15}/>{copied==="invite"?"Copied":"Copy guest link"}</button>}</div>
         {invitation.id&&<div className="mt-6 border-t border-stone-100 pt-5"><div className="flex flex-wrap justify-between gap-2"><h4 className="font-serif text-lg">Event schedule</h4><button onClick={()=>setEvent({...blankEvent,invitation_id:invitation.id})} className={btn+" border border-stone-200"}><Plus size={15}/>Add event</button></div>{eventsFor(invitation.id).map((e:any)=><div key={e.id} className="mt-2 flex items-center justify-between gap-2 rounded-xl bg-stone-50 p-3"><div><p className="font-semibold">{e.title}</p><p className="text-xs text-stone-500">{moneylessDate(e.event_date)} · {e.venue}</p></div><button onClick={()=>setEvent({...e})} className="text-sm underline">Edit</button></div>)}</div>}
         </>:<p className="mt-4 text-sm text-stone-500">Choose an invitation or create a new one. First add a client, then create the invitation.</p>}</section></div>}
