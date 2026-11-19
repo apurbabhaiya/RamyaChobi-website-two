@@ -58,6 +58,10 @@ function InvitationPublic({slug}:{slug:string}) {
   const [selectedEvent,setSelectedEvent] = useState("");
   const [notice,setNotice] = useState("");
   const [sending,setSending] = useState(false);
+  const [comments,setComments] = useState<any[]>([]);
+  const [commentName,setCommentName] = useState("");
+  const [commentText,setCommentText] = useState("");
+  const [commentSending,setCommentSending] = useState(false);
   useEffect(()=>{
     const q=new URLSearchParams(window.location.search);const t=q.get("guest")||"";setGuestToken(t);
     let live=true;
@@ -66,6 +70,9 @@ function InvitationPublic({slug}:{slug:string}) {
     }).finally(()=>live&&setLoading(false));
     return()=>{live=false};
   },[slug]);
+  useEffect(()=>{let live=true;db.rpc("get_wedding_invitation_comments",{p_slug:slug}).then(({data,error}:any)=>{if(live&&!error)setComments(Array.isArray(data)?data:[])});return()=>{live=false}},[slug]);
+  useEffect(()=>{if(!data?.invitation)return;const i=data.invitation;document.title=`${i.bride_name||"Bride"} & ${i.groom_name||"Groom"} Wedding Invitation | RamyaChobi`;const desc=(i.welcome_message||"View the wedding invitation, event details and RSVP.").slice(0,155);let meta=document.querySelector('meta[name="description"]') as HTMLMetaElement|null;if(!meta){meta=document.createElement("meta");meta.name="description";document.head.appendChild(meta)}meta.content=desc;let canonical=document.querySelector('link[rel="canonical"]') as HTMLLinkElement|null;if(!canonical){canonical=document.createElement("link");canonical.rel="canonical";document.head.appendChild(canonical)}canonical.href=window.location.href.split("?")[0];const put=(property:string,content:string)=>{let el=document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement|null;if(!el){el=document.createElement("meta");el.setAttribute("property",property);document.head.appendChild(el)}el.content=content};put("og:title",document.title);put("og:description",desc);put("og:url",canonical.href);put("og:type","website");if(i.cover_image_url)put("og:image",i.cover_image_url);const schema={'@context':"https://schema.org",'@type':"Event",name:`${i.bride_name||"Bride"} & ${i.groom_name||"Groom"} Wedding`,description:desc,url:canonical.href,image:i.cover_image_url||undefined,startDate:data.events?.[0]?.event_date||undefined,organizer:{'@type':"Organization",name:"RamyaChobi"}};let ld=document.getElementById("ramya-invitation-schema");if(!ld){ld=document.createElement("script");ld.id="ramya-invitation-schema";ld.setAttribute("type","application/ld+json");document.head.appendChild(ld)}ld.textContent=JSON.stringify(schema)},[data]);
+  const submitComment=async(e:React.FormEvent)=>{e.preventDefault();setCommentSending(true);setNotice("");try{const {data:result,error}=await db.rpc("submit_wedding_invitation_comment",{p_slug:slug,p_guest_name:commentName,p_message:commentText,p_website:""});if(error)throw error;setNotice(result?.message||"Thank you. Your wish is awaiting approval.");setCommentName("");setCommentText("")}catch(e:any){setNotice(e?.message||"Could not submit your wish.")}finally{setCommentSending(false)}};
   const submit = async(e:React.FormEvent)=>{
     e.preventDefault();setSending(true);setNotice("");
     try{
@@ -120,7 +127,8 @@ function InvitationPublic({slug}:{slug:string}) {
           {notice&&<p role="status" className="rounded-xl bg-amber-50 p-3 text-center text-sm text-amber-900">{notice}</p>}
         </form>
       </section>
-      <footer className="py-10 text-center text-xs opacity-60">Invitation crafted with love by <strong>RamyaChobi</strong></footer>
+      <section className="mt-12 rounded-[2rem] border border-[#b69a64]/40 bg-white/65 p-6 shadow-lg sm:p-9"><div className="text-center"><p className="text-xs uppercase tracking-[.28em] text-amber-800">Share your wishes</p><h2 className="mt-2 font-serif text-3xl">Guest Wishes · শুভেচ্ছা</h2><p className="mt-2 text-sm text-stone-600">Leave a kind message for the couple. Messages appear after review.</p></div><form onSubmit={submitComment} className="mx-auto mt-6 max-w-lg space-y-3"><input required maxLength={120} className={input} placeholder="Your name / আপনার নাম" value={commentName} onChange={e=>setCommentName(e.target.value)}/><textarea required minLength={2} maxLength={500} rows={3} className={input} placeholder="Write your wishes / শুভেচ্ছা লিখুন" value={commentText} onChange={e=>setCommentText(e.target.value)}/><button disabled={commentSending} className={btn+" w-full bg-[#80663c] text-white"}><Send size={15}/>{commentSending?"Submitting…":"Submit wishes / শুভেচ্ছা পাঠান"}</button></form><div className="mx-auto mt-8 max-w-2xl space-y-3">{comments.map((c:any)=><article key={c.id} className="rounded-xl border border-[#b69a64]/25 bg-[#fbf8f1] p-4"><p className="font-semibold">{c.guest_name}</p><p className="mt-1 text-sm leading-6 text-stone-700">{c.message}</p></article>)}{!comments.length&&<p className="text-center text-sm text-stone-500">Be the first to leave a wish.</p>}</div></section>
+      <footer className="py-10 text-center text-xs opacity-60">Invitation crafted with love by <a className="font-semibold underline" href="/">RamyaChobi</a></footer>
     </div>
   </main>;
 }
@@ -144,6 +152,8 @@ function AdminWorkspace(){
   const [guest,setGuest]=useState<any>(null);
   const [selectedInvitation,setSelectedInvitation]=useState("");
   const [copied,setCopied]=useState("");
+  const [commentRows,setCommentRows]=useState<any[]>([]);
+  const [commentLoading,setCommentLoading]=useState(false);
   const call=useCallback(async(action:string,payloadValue:any={})=>{
     const {data,error}=await db.rpc("wedding_invitation_admin",{p_token:auth.token,p_action:action,p_payload:payloadValue});
     if(error)throw error;return data;
@@ -169,7 +179,10 @@ function AdminWorkspace(){
   const guestsFor=(id:string)=>(payload.guests||[]).filter((g:any)=>g.invitation_id===id);
   const rsvpsFor=(id:string)=>(payload.rsvps||[]).filter((r:any)=>r.invitation_id===id);
   const eventsFor=(id:string)=>(payload.events||[]).filter((e:any)=>e.invitation_id===id);
-  const nav=[["dashboard","Dashboard"],["clients","Clients"],["invitations","Invitations"],["guests","Guest list"],["rsvps","RSVP responses"]];
+  const loadComments=async()=>{setCommentLoading(true);try{const result=await call("dashboard");setCommentRows(result.comments||[])}catch(e:any){setNotice(e?.message||"Could not load comments.")}finally{setCommentLoading(false)}};
+  const moderateComment=async(id:string,approved:boolean)=>{try{await db.rpc("wedding_invitation_comment_admin",{p_token:auth.token,p_action:"moderate",p_payload:{id,approved}});await loadComments()}catch(e:any){setNotice(e?.message||"Could not update comment.")}};
+  const deleteComment=async(id:string)=>{if(!window.confirm("Delete this guest wish permanently?"))return;try{await db.rpc("wedding_invitation_comment_admin",{p_token:auth.token,p_action:"delete",p_payload:{id}});await loadComments()}catch(e:any){setNotice(e?.message||"Could not delete comment.")}};
+  const nav=[["dashboard","Dashboard"],["clients","Clients"],["invitations","Invitations"],["guests","Guest list"],["rsvps","RSVP responses"],["comments","Guest wishes"]];
   if(!auth.ready)return <div className="min-h-screen grid place-items-center bg-stone-950 text-white"><RefreshCw className="animate-spin"/></div>;
   if(!auth.token)return <main className="grid min-h-screen place-items-center bg-[#f5f1e9] px-4"><form onSubmit={auth.login} className="w-full max-w-md rounded-3xl border border-stone-200 bg-white p-8 shadow-2xl">
     <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#4b1525] text-2xl text-amber-200">র</div>
@@ -215,6 +228,7 @@ function AdminWorkspace(){
         {selected&&guestsFor(selected.id).map((g:any)=><div key={g.id} className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-100 p-3"><div><p className="font-semibold">{g.guest_name}</p><p className="text-xs text-stone-500">{g.side} side · {g.group_name||"General"} · {g.rsvp_status}</p></div><div className="flex gap-2"><button onClick={()=>void copy(publicUrl(selected)+"?guest="+g.invite_token,"guest-"+g.id)} className="text-sm underline">{copied==="guest-"+g.id?"Copied":"Copy personal link"}</button><button onClick={()=>setGuest({...g})} className="text-sm underline">Edit</button></div></div>)}
       </section>}
       {tab==="rsvps"&&<section className="mt-5 rounded-2xl border border-stone-200 bg-white p-5"><h3 className="font-serif text-xl">Guest RSVP responses</h3>{payload.rsvps.map((r:any)=><div key={r.id} className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-100 p-4"><div><p className="font-semibold">{r.guest_name}</p><p className="text-xs text-stone-500">{r.phone} · {r.attendance==="attending"?"Attending":"Not attending"} · {r.attendee_count} guests</p>{r.message&&<p className="mt-1 text-sm text-stone-600">{r.message}</p>}</div><button onClick={()=>void save("review_rsvp",{id:r.id,reviewed:!r.reviewed})} className={btn+" border border-stone-200"}>{r.reviewed?"Reviewed":"Mark reviewed"}</button></div>)}</section>}
+      {tab==="comments"&&<section className="mt-5 rounded-2xl border border-stone-200 bg-white p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-serif text-xl">Guest wishes moderation</h3><p className="text-sm text-stone-500">Approve a message before it appears on the public invitation.</p></div><button onClick={()=>void loadComments()} className={btn+" border border-stone-200"}><RefreshCw size={15}/>Refresh</button></div>{commentLoading&&<p className="mt-4 text-sm">Loading…</p>}{commentRows.map((c:any)=><article key={c.id} className="mt-3 rounded-xl border border-stone-100 p-4"><div className="flex flex-wrap justify-between gap-3"><div><p className="font-semibold">{c.guest_name} <span className="text-xs font-normal text-stone-500">· {c.client_name} · {c.slug}</span></p><p className="mt-2 text-sm text-stone-700">{c.message}</p><p className="mt-2 text-xs text-stone-500">{new Date(c.created_at).toLocaleString()}</p></div><div className="flex gap-2"><button onClick={()=>void moderateComment(c.id,!c.approved)} className={btn+" border border-stone-200"}>{c.approved?"Unpublish":"Approve"}</button><button onClick={()=>void deleteComment(c.id)} className={btn+" border border-red-200 text-red-700"}><Trash2 size={14}/>Delete</button></div></div></article>)}{!commentRows.length&&!commentLoading&&<p className="mt-4 text-sm text-stone-500">No guest wishes yet.</p>}</section>}
     </div>
     {event&&<div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-3"><div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5"><div className="flex justify-between"><h3 className="font-serif text-xl">{event.id?"Edit event":"Add event"}</h3><button onClick={()=>setEvent(null)}><X/></button></div><div className="mt-4 grid gap-3 sm:grid-cols-2">{[
       ["title","Event name (English)"],["title_bn","Event name (বাংলা)"],["event_date","Date"],["start_time","Start time"],["end_time","End time"],["venue","Venue (English)"],["venue_bn","Venue (বাংলা)"],["address","Full address (English)"],["address_bn","Full address (বাংলা)"],["maps_url","Google Maps URL"]
