@@ -69,6 +69,7 @@ function InvitationPublic({slug}:{slug:string}) {
   const [commentName,setCommentName] = useState("");
   const [commentText,setCommentText] = useState("");
   const [commentSending,setCommentSending] = useState(false);
+  const [autoScrollActive,setAutoScrollActive] = useState(true);
   useEffect(()=>{
     const q=new URLSearchParams(window.location.search);const t=q.get("guest")||"";setGuestToken(t);
     let live=true;
@@ -78,6 +79,39 @@ function InvitationPublic({slug}:{slug:string}) {
     return()=>{live=false};
   },[slug]);
   useEffect(()=>{let live=true;db.rpc("get_wedding_invitation_comments",{p_slug:slug}).then(({data,error}:any)=>{if(live&&!error)setComments(Array.isArray(data)?data:[])});return()=>{live=false}},[slug]);
+  useEffect(()=>{
+    if(!data||!autoScrollActive)return;
+    if(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches){setAutoScrollActive(false);return;}
+    let frame=0,last=0;
+    const step=(now:number)=>{
+      if(!last)last=now;
+      const elapsed=Math.min(now-last,80);
+      window.scrollBy(0,elapsed*0.03);
+      last=now;
+      if(window.scrollY+window.innerHeight<document.documentElement.scrollHeight-2)frame=window.requestAnimationFrame(step);
+      else setAutoScrollActive(false);
+    };
+    const start=window.setTimeout(()=>{frame=window.requestAnimationFrame(step)},2500);
+    return()=>{window.clearTimeout(start);if(frame)window.cancelAnimationFrame(frame)};
+  },[data,autoScrollActive]);
+  useEffect(()=>{
+    if(!data)return;
+    const pauseOnInteraction=(event:Event)=>{
+      const target=event.target as HTMLElement|null;
+      if(target?.closest("[data-auto-scroll-toggle]"))return;
+      setAutoScrollActive(false);
+    };
+    window.addEventListener("wheel",pauseOnInteraction,{passive:true});
+    window.addEventListener("touchstart",pauseOnInteraction,{passive:true});
+    window.addEventListener("pointerdown",pauseOnInteraction,{passive:true});
+    window.addEventListener("keydown",pauseOnInteraction);
+    return()=>{
+      window.removeEventListener("wheel",pauseOnInteraction);
+      window.removeEventListener("touchstart",pauseOnInteraction);
+      window.removeEventListener("pointerdown",pauseOnInteraction);
+      window.removeEventListener("keydown",pauseOnInteraction);
+    };
+  },[data]);
   useEffect(()=>{if(!data?.invitation)return;const i=data.invitation;document.title=`${i.bride_name||"Bride"} & ${i.groom_name||"Groom"} Wedding Invitation | RamyaChobi`;const desc=(i.welcome_message||"View the wedding invitation, event details and RSVP.").slice(0,155);let meta=document.querySelector('meta[name="description"]') as HTMLMetaElement|null;if(!meta){meta=document.createElement("meta");meta.name="description";document.head.appendChild(meta)}meta.content=desc;let canonical=document.querySelector('link[rel="canonical"]') as HTMLLinkElement|null;if(!canonical){canonical=document.createElement("link");canonical.rel="canonical";document.head.appendChild(canonical)}canonical.href=window.location.href.split("?")[0];const put=(property:string,content:string)=>{let el=document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement|null;if(!el){el=document.createElement("meta");el.setAttribute("property",property);document.head.appendChild(el)}el.content=content};put("og:title",document.title);put("og:description",desc);put("og:url",canonical.href);put("og:type","website");if(i.cover_image_url)put("og:image",i.cover_image_url);const schema={'@context':"https://schema.org",'@type':"Event",name:`${i.bride_name||"Bride"} & ${i.groom_name||"Groom"} Wedding`,description:desc,url:canonical.href,image:i.cover_image_url||undefined,startDate:data.events?.[0]?.event_date||undefined,organizer:{'@type':"Organization",name:"RamyaChobi"}};let ld=document.getElementById("ramya-invitation-schema");if(!ld){ld=document.createElement("script");ld.id="ramya-invitation-schema";ld.setAttribute("type","application/ld+json");document.head.appendChild(ld)}ld.textContent=JSON.stringify(schema)},[data]);
   const submitComment=async(e:React.FormEvent)=>{e.preventDefault();setCommentSending(true);setNotice("");try{const {data:result,error}=await db.rpc("submit_wedding_invitation_comment",{p_slug:slug,p_guest_name:commentName,p_message:commentText,p_website:""});if(error)throw error;setNotice(result?.message||"Thank you. Your wish is awaiting approval.");setCommentName("");setCommentText("")}catch(e:any){setNotice(e?.message||"Could not submit your wish.")}finally{setCommentSending(false)}};
   const submit = async(e:React.FormEvent)=>{
@@ -136,6 +170,7 @@ function InvitationPublic({slug}:{slug:string}) {
       </section>
       <section className="mt-12 rounded-[2rem] border border-[#b69a64]/40 bg-white/65 p-6 shadow-lg sm:p-9"><div className="text-center"><p className="text-xs uppercase tracking-[.28em] text-amber-800">Share your wishes</p><h2 className="mt-2 font-serif text-3xl">Guest Wishes · শুভেচ্ছা</h2><p className="mt-2 text-sm text-stone-600">Leave a kind message for the couple. Messages appear after review.</p></div><form onSubmit={submitComment} className="mx-auto mt-6 max-w-lg space-y-3"><input required maxLength={120} className={input} placeholder="Your name / আপনার নাম" value={commentName} onChange={e=>setCommentName(e.target.value)}/><textarea required minLength={2} maxLength={500} rows={3} className={input} placeholder="Write your wishes / শুভেচ্ছা লিখুন" value={commentText} onChange={e=>setCommentText(e.target.value)}/><button disabled={commentSending} className={btn+" w-full bg-[#80663c] text-white"}><Send size={15}/>{commentSending?"Submitting…":"Submit wishes / শুভেচ্ছা পাঠান"}</button></form><div className="mx-auto mt-8 max-w-2xl space-y-3">{comments.map((c:any)=><article key={c.id} className="rounded-xl border border-[#b69a64]/25 bg-[#fbf8f1] p-4"><p className="font-semibold">{c.guest_name}</p><p className="mt-1 text-sm leading-6 text-stone-700">{c.message}</p></article>)}{!comments.length&&<p className="text-center text-sm text-stone-500">Be the first to leave a wish.</p>}</div></section>
       <footer className="py-10 text-center text-xs opacity-60">Invitation crafted with love by <a className="font-semibold underline" href="/">RamyaChobi</a></footer>
+      <button data-auto-scroll-toggle onClick={()=>setAutoScrollActive(v=>!v)} className="fixed bottom-4 right-4 z-50 rounded-full border border-[#b69a64]/50 bg-[#4b1525] px-4 py-3 text-xs font-semibold text-amber-50 shadow-xl">{autoScrollActive?"Pause auto-scroll":"Resume auto-scroll"}</button>
     </div>
   </main>;
 }
