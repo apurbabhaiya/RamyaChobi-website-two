@@ -55,6 +55,7 @@ function InvitationPublic({slug}:{slug:string}) {
   const [phone,setPhone] = useState("");
   const [email,setEmail] = useState("");
   const [message,setMessage] = useState("");
+  const [selectedEvent,setSelectedEvent] = useState("");
   const [notice,setNotice] = useState("");
   const [sending,setSending] = useState(false);
   useEffect(()=>{
@@ -70,7 +71,7 @@ function InvitationPublic({slug}:{slug:string}) {
     try{
       const {data,error}=await db.rpc("submit_wedding_invitation_rsvp",{
         p_slug:slug,p_guest_token:guestToken||null,p_guest_name:guestName,p_phone:phone,p_email:email,
-        p_attendance:attendance,p_attendee_count:attendance==="attending"?count:0,p_message:message,p_event_id:null
+        p_attendance:attendance,p_attendee_count:attendance==="attending"?count:0,p_message:message,p_event_id:selectedEvent||null
       });
       if(error)throw error;setNotice(data?.message||"Thank you for your response.");
     }catch(e:any){setNotice(e?.message||"Could not submit your RSVP.")}
@@ -110,12 +111,12 @@ function InvitationPublic({slug}:{slug:string}) {
       <section className="rounded-[2rem] bg-white/60 p-6 text-stone-800 shadow-xl sm:p-10">
         <h2 className="text-center font-serif text-3xl">{language==="bn"?"আপনার উপস্থিতি নিশ্চিত করুন":"Kindly Respond"}{language==="both"?" · আপনার উপস্থিতি নিশ্চিত করুন":""}</h2><p className="mt-2 text-center text-sm text-stone-500">{language==="bn"?"অনুষ্ঠানে উপস্থিত থাকতে পারবেন কি না জানাবেন।":"Please let us know if you can join our celebration."}</p>
         <form onSubmit={submit} className="mx-auto mt-7 max-w-md space-y-4">
-          <label className="block text-sm font-medium">Your name<input required className={input+" mt-1"} value={guestName} onChange={e=>setGuestName(e.target.value)} readOnly={!!data.guest}/></label>
-          {!guestToken&&<><label className="block text-sm font-medium">Phone number<input required className={input+" mt-1"} value={phone} onChange={e=>setPhone(e.target.value)} /></label><label className="block text-sm font-medium">Email (optional)<input className={input+" mt-1"} type="email" value={email} onChange={e=>setEmail(e.target.value)}/></label></>}
-          <label className="block text-sm font-medium">Will you attend?<select className={input+" mt-1"} value={attendance} onChange={e=>setAttendance(e.target.value)}><option value="attending">Joyfully accept</option><option value="not_attending">Regretfully decline</option></select></label>
-          {attendance==="attending"&&<label className="block text-sm font-medium">Number of attendees<input type="number" min="1" max={data.guest?.max_attendees||20} className={input+" mt-1"} value={count} onChange={e=>setCount(Number(e.target.value))}/></label>}
-          <label className="block text-sm font-medium">Message (optional)<textarea rows={3} className={input+" mt-1"} value={message} onChange={e=>setMessage(e.target.value)}/></label>
-          <button disabled={sending} className={btn+" w-full bg-stone-900 text-white disabled:opacity-50"}><Send size={16}/>{sending?"Sending…":"Send RSVP"}</button>
+          <label className="block text-sm font-medium">Your name / আপনার নাম<input required className={input+" mt-1"} value={guestName} onChange={e=>setGuestName(e.target.value)} readOnly={!!data.guest}/></label>
+          {!guestToken&&<><label className="block text-sm font-medium">Phone number / ফোন নম্বর<input required className={input+" mt-1"} value={phone} onChange={e=>setPhone(e.target.value)} /></label><label className="block text-sm font-medium">Email (optional) / ইমেইল (ঐচ্ছিক)<input className={input+" mt-1"} type="email" value={email} onChange={e=>setEmail(e.target.value)}/></label></>}
+          <label className="block text-sm font-medium">Will you attend? / আপনি কি উপস্থিত থাকবেন?<select className={input+" mt-1"} value={attendance} onChange={e=>setAttendance(e.target.value)}><option value="attending">Joyfully accept</option><option value="not_attending">Regretfully decline</option></select></label>
+          {(data.events||[]).length>0&&<label className="block text-sm font-medium">Which event? / কোন অনুষ্ঠানে?<select className={input+" mt-1"} value={selectedEvent} onChange={e=>setSelectedEvent(e.target.value)}><option value="">All events / সব অনুষ্ঠান</option>{data.events.map((ev:any)=><option key={ev.id} value={ev.id}>{ev.title} / {ev.title_bn||ev.title}</option>)}</select>}{attendance==="attending"&&<label className="block text-sm font-medium">Number of attendees / অতিথির সংখ্যা<input type="number" min="1" max={data.guest?.max_attendees||20} className={input+" mt-1"} value={count} onChange={e=>setCount(Number(e.target.value))}/></label>}
+          <label className="block text-sm font-medium">Message (optional) / বার্তা (ঐচ্ছিক)<textarea rows={3} className={input+" mt-1"} value={message} onChange={e=>setMessage(e.target.value)}/></label>
+          <button disabled={sending} className={btn+" w-full bg-stone-900 text-white disabled:opacity-50"}><Send size={16}/>{sending?"Sending…":"Send RSVP / উত্তর পাঠান"}</button>
           {notice&&<p role="status" className="rounded-xl bg-amber-50 p-3 text-center text-sm text-amber-900">{notice}</p>}
         </form>
       </section>
@@ -186,7 +187,7 @@ function AdminWorkspace(){
     </div></header>
     <div className="mx-auto max-w-[1500px] px-4 py-6">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{[
-        ["Total clients",payload.clients.length],["Invitations",payload.invitations.length],["Published",payload.invitations.filter((i:any)=>i.status==="published").length],["Guest responses",payload.rsvps.length]
+        ["Total clients",payload.clients.length],["Invitations",payload.invitations.length],["Published",payload.invitations.filter((i:any)=>i.status==="published").length],["Guest responses",payload.rsvps.length+payload.guests.filter((g:any)=>g.rsvp_status!=="pending").length]
       ].map(([label,value]:any)=><div key={label} className="rounded-2xl border border-stone-200 bg-white p-5"><p className="text-sm text-stone-500">{label}</p><p className="mt-2 font-serif text-3xl">{value}</p></div>)}</div>
       <nav className="mt-6 flex gap-2 overflow-x-auto pb-2">{nav.map(([id,label])=><button key={id} onClick={()=>setTab(id)} className={"shrink-0 rounded-xl px-4 py-3 text-sm font-semibold "+(tab===id?"bg-[#4b1525] text-white":"border border-stone-200 bg-white text-stone-600")}>{label}</button>)}</nav>
       {notice&&<div role="status" className="mt-4 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{notice}<button onClick={()=>setNotice("")}><X size={16}/></button></div>}
