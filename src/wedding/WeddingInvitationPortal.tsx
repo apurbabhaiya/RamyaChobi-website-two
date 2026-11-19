@@ -179,7 +179,7 @@ function AdminWorkspace(){
   const guestsFor=(id:string)=>(payload.guests||[]).filter((g:any)=>g.invitation_id===id);
   const rsvpsFor=(id:string)=>(payload.rsvps||[]).filter((r:any)=>r.invitation_id===id);
   const eventsFor=(id:string)=>(payload.events||[]).filter((e:any)=>e.invitation_id===id);
-  const loadComments=async()=>{setCommentLoading(true);try{const result=await call("dashboard");setCommentRows(result.comments||[])}catch(e:any){setNotice(e?.message||"Could not load comments.")}finally{setCommentLoading(false)}};
+  const loadComments=async()=>{setCommentLoading(true);try{const {data,error}=await db.rpc("wedding_invitation_comment_admin",{p_token:auth.token,p_action:"dashboard",p_payload:{}});if(error)throw error;setCommentRows(data?.comments||[])}catch(e:any){setNotice(e?.message||"Could not load comments.")}finally{setCommentLoading(false)}};
   const moderateComment=async(id:string,approved:boolean)=>{try{await db.rpc("wedding_invitation_comment_admin",{p_token:auth.token,p_action:"moderate",p_payload:{id,approved}});await loadComments()}catch(e:any){setNotice(e?.message||"Could not update comment.")}};
   const deleteComment=async(id:string)=>{if(!window.confirm("Delete this guest wish permanently?"))return;try{await db.rpc("wedding_invitation_comment_admin",{p_token:auth.token,p_action:"delete",p_payload:{id}});await loadComments()}catch(e:any){setNotice(e?.message||"Could not delete comment.")}};
   const nav=[["dashboard","Dashboard"],["clients","Clients"],["invitations","Invitations"],["guests","Guest list"],["rsvps","RSVP responses"],["comments","Guest wishes"]];
