@@ -71,6 +71,7 @@ function InvitationPublic({slug}:{slug:string}) {
   const [commentSending,setCommentSending] = useState(false);
   const [autoScrollActive,setAutoScrollActive] = useState(true);
   const [musicPlaying,setMusicPlaying] = useState(false);
+  const [musicAutoplayPending,setMusicAutoplayPending] = useState(false);
   const audioRef = useRef<HTMLAudioElement|null>(null);
   useEffect(()=>{
     const q=new URLSearchParams(window.location.search);const t=q.get("guest")||"";setGuestToken(t);
@@ -115,7 +116,28 @@ function InvitationPublic({slug}:{slug:string}) {
     };
   },[data]);
   useEffect(()=>{if(!data?.invitation)return;const i=data.invitation;document.title=`${i.bride_name||"Bride"} & ${i.groom_name||"Groom"} Wedding Invitation | RamyaChobi`;const desc=(i.welcome_message||"View the wedding invitation, event details and RSVP.").slice(0,155);let meta=document.querySelector('meta[name="description"]') as HTMLMetaElement|null;if(!meta){meta=document.createElement("meta");meta.name="description";document.head.appendChild(meta)}meta.content=desc;let canonical=document.querySelector('link[rel="canonical"]') as HTMLLinkElement|null;if(!canonical){canonical=document.createElement("link");canonical.rel="canonical";document.head.appendChild(canonical)}canonical.href=window.location.href.split("?")[0];const put=(property:string,content:string)=>{let el=document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement|null;if(!el){el=document.createElement("meta");el.setAttribute("property",property);document.head.appendChild(el)}el.content=content};put("og:title",document.title);put("og:description",desc);put("og:url",canonical.href);put("og:type","website");if(i.cover_image_url)put("og:image",i.cover_image_url);const schema={'@context':"https://schema.org",'@type':"Event",name:`${i.bride_name||"Bride"} & ${i.groom_name||"Groom"} Wedding`,description:desc,url:canonical.href,image:i.cover_image_url||undefined,startDate:data.events?.[0]?.event_date||undefined,organizer:{'@type':"Organization",name:"RamyaChobi"}};let ld=document.getElementById("ramya-invitation-schema");if(!ld){ld=document.createElement("script");ld.id="ramya-invitation-schema";ld.setAttribute("type","application/ld+json");document.head.appendChild(ld)}ld.textContent=JSON.stringify(schema)},[data]);
-  const toggleMusic=async()=>{const audio=audioRef.current;if(!audio)return;if(audio.paused){try{await audio.play();setMusicPlaying(true)}catch{setNotice("Tap Play again to start the wedding music.")}}else{audio.pause();setMusicPlaying(false)}};
+  useEffect(()=>{
+    if(!data?.invitation?.music_url)return;
+    const audio=audioRef.current;
+    if(!audio)return;
+    let disposed=false;
+    const cleanup=()=>{
+      window.removeEventListener("pointerdown",startFromGesture,true);
+      window.removeEventListener("touchstart",startFromGesture,true);
+      window.removeEventListener("keydown",startFromGesture,true);
+    };
+    const started=()=>{if(disposed)return;setMusicPlaying(true);setMusicAutoplayPending(false);cleanup()};
+    const startFromGesture=()=>{
+      if(!audio.paused)return;
+      try{const result=audio.play();if(result)result.then(started).catch(()=>setMusicAutoplayPending(true));else started()}catch{setMusicAutoplayPending(true)}
+    };
+    audio.loop=true;
+    audio.play().then(started).catch(()=>setMusicAutoplayPending(true));
+    window.addEventListener("pointerdown",startFromGesture,true);
+    window.addEventListener("touchstart",startFromGesture,true);
+    window.addEventListener("keydown",startFromGesture,true);
+    return()=>{disposed=true;cleanup();audio.pause()};
+  },[data?.invitation?.music_url]);
   const submitComment=async(e:React.FormEvent)=>{e.preventDefault();setCommentSending(true);setNotice("");try{const {data:result,error}=await db.rpc("submit_wedding_invitation_comment",{p_slug:slug,p_guest_name:commentName,p_message:commentText,p_website:""});if(error)throw error;setNotice(result?.message||"Thank you. Your wish is awaiting approval.");setCommentName("");setCommentText("")}catch(e:any){setNotice(e?.message||"Could not submit your wish.")}finally{setCommentSending(false)}};
   const submit = async(e:React.FormEvent)=>{
     e.preventDefault();setSending(true);setNotice("");
@@ -133,7 +155,7 @@ function InvitationPublic({slug}:{slug:string}) {
   const i=data.invitation, c=data.invitation, t=themes[i.theme]||themes["ivory-gold"];
   return <main className={"min-h-screen "+t}>
     <div className="mx-auto max-w-3xl px-4 py-6 sm:py-12">
-      {i.music_url&&<div className="mb-4 flex items-center justify-between rounded-2xl border border-[#b69a64]/40 bg-white/70 px-4 py-3 shadow-sm"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-full bg-[#80663c] text-white"><Music2 size={18}/></span><div><p className="text-sm font-semibold text-[#5a4527]">Wedding soundtrack</p><p className="text-xs text-stone-500">A song chosen for this celebration</p></div></div><button onClick={()=>void toggleMusic()} className="rounded-full bg-[#80663c] px-4 py-2 text-sm font-semibold text-white">{musicPlaying?"Pause":"Play music"}</button><audio ref={audioRef} src={i.music_url} loop preload="none" onPause={()=>setMusicPlaying(false)} onPlay={()=>setMusicPlaying(true)}/></div>}
+      {i.music_url&&<div className="mb-4 flex items-center justify-between rounded-2xl border border-[#b69a64]/40 bg-white/70 px-4 py-3 shadow-sm"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-full bg-[#80663c] text-white"><Music2 size={18}/></span><div><p className="text-sm font-semibold text-[#5a4527]">Wedding soundtrack</p><p className="text-xs text-stone-500">{musicPlaying?"Now playing · Background music":musicAutoplayPending?"Tap anywhere once if your browser blocks autoplay":"Music will start automatically"}</p></div></div>{musicPlaying&&<button onClick={()=>{audioRef.current?.pause();setMusicPlaying(false)}} aria-label="Pause wedding music" className="rounded-full bg-[#80663c] px-4 py-2 text-sm font-semibold text-white">Pause</button>}<audio ref={audioRef} src={i.music_url} autoPlay loop preload="auto" onPause={()=>setMusicPlaying(false)} onPlay={()=>{setMusicPlaying(true);setMusicAutoplayPending(false)}}/></div>}
       <div className="mb-4 flex justify-end gap-1 rounded-full border border-[#b69a64]/40 bg-white/60 p-1 text-xs"><button onClick={()=>setLanguage("both")} className={"rounded-full px-3 py-1.5 "+(language==="both"?"bg-[#80663c] text-white":"")}>English + বাংলা</button><button onClick={()=>setLanguage("en")} className={"rounded-full px-3 py-1.5 "+(language==="en"?"bg-[#80663c] text-white":"")}>English</button><button onClick={()=>setLanguage("bn")} className={"rounded-full px-3 py-1.5 "+(language==="bn"?"bg-[#80663c] text-white":"")}>বাংলা</button></div>
       <div className="overflow-hidden rounded-[2rem] border border-current/10 bg-white/30 shadow-2xl shadow-black/10">
         {i.cover_image_url&&<img src={i.cover_image_url} alt="Wedding cover" className="h-64 w-full object-cover sm:h-[420px]"/>}
