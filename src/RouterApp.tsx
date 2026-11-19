@@ -15,14 +15,15 @@ import AlbumGalleryPage from "./home/AlbumGalleryPage";
 import FacebookAccessGate from "./home/FacebookAccessGate";
 import SpinResultSubmission from "./home/SpinResultSubmission";
 import WeddingMembershipPage from "./home/WeddingMembershipPage";
+import WeddingInvitationPortal from "./wedding/WeddingInvitationPortal";
 
-const withChat = (page: React.ReactNode) => /^(\/booking\/admin|\/delivery-admin|\/studio)(\/|$)/.test(window.location.pathname) ? <>{page}</> : <>{page}<RamyaChatWidget /></>;
+const withChat = (page: React.ReactNode) => /^(\/booking\/admin|\/delivery-admin|\/invitation-admin|\/studio)(\/|$)/.test(window.location.pathname) ? <>{page}</> : <>{page}<RamyaChatWidget /></>;
 
 export default function RouterApp() {
   const path = window.location.pathname;
 
   useEffect(() => {
-    const isPublicPage = path === "/" || path === "/about" || path === "/packages" || path === "/portfolio" || path === "/stories" || path === "/blog" || path === "/wedding-membership";
+    const isPublicPage = path === "/" || path === "/about" || path === "/packages" || path === "/portfolio" || path === "/stories" || path === "/blog" || path === "/wedding-membership" || path.startsWith("/invite/");
     let robots = document.querySelector('meta[name="robots"]') as HTMLMetaElement | null;
     if (!robots) {
       robots = document.createElement("meta");
@@ -51,6 +52,8 @@ export default function RouterApp() {
             ? "Face Search · RamyaChobi"
             : path === "/client-gallery"
               ? "Client Gallery · RamyaChobi"
+              : path === "/invitation-admin"
+              ? "RamyaChobi · Invitation Studio"
               : path.startsWith("/delivery-admin")
               ? "RamyaChobi · Delivery Admin"
               : path.startsWith("/delivery")
@@ -64,6 +67,9 @@ export default function RouterApp() {
 
   const page = (() => {
   if (path === "/facebook-login") return <FacebookAccessGate callback />;
+
+  if (path === "/invitation-admin") return <WeddingInvitationPortal />;
+  if (path.startsWith("/invite/")) return <WeddingInvitationPortal />;
 
   if (path === "/") return <RamyaChobiEntry />;
   if (path === "/spin-result") return <SpinResultSubmission />;
