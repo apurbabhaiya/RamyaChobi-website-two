@@ -9,7 +9,7 @@ export default async function handler(req: VercelRequest,res: VercelResponse) {
   const token = String(req.query.token || '').trim();
   if (!/^[0-9a-f-]{36}$/i.test(token)) return json(res,400,{error:'Invalid membership card token.'});
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '';
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
   if (!url || !key) return json(res,503,{error:'Membership card service is unavailable.'});
   const response = await fetch(`${url}/rest/v1/rpc/get_wedding_membership_card`,{
     method:'POST',headers:{apikey:key,Authorization:`Bearer ${key}`,'content-type':'application/json'},
