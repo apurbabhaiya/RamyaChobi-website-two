@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase, SUPABASE_URL } from "../services/supabase";
+import { buildWeddingGuestReport, downloadWeddingGuestWorkbook, downloadWeddingGuestPdf } from "./guestReport";
 import {
   CalendarDays, Camera, Check, ChevronRight, Copy, ExternalLink, Eye, Heart,
   ImagePlus, Link2, LogIn, LogOut, MapPin, Plus, RefreshCw, Save, Search,
@@ -262,6 +263,8 @@ function AdminWorkspace(){
   const [copied,setCopied]=useState("");
   const [commentRows,setCommentRows]=useState<any[]>([]);
   const [commentLoading,setCommentLoading]=useState(false);
+  const [rsvpScope,setRsvpScope]=useState("all");
+  const [exportBusy,setExportBusy]=useState(false);
   const call=useCallback(async(action:string,payloadValue:any={})=>{
     const {data,error}=await db.rpc("wedding_invitation_admin",{p_token:auth.token,p_action:action,p_payload:payloadValue});
     if(error)throw error;return data;
@@ -344,6 +347,17 @@ function AdminWorkspace(){
   const loadComments=async()=>{setCommentLoading(true);try{const {data,error}=await db.rpc("wedding_invitation_comment_admin",{p_token:auth.token,p_action:"dashboard",p_payload:{}});if(error)throw error;setCommentRows(data?.comments||[])}catch(e:any){setNotice(e?.message||"Could not load comments.")}finally{setCommentLoading(false)}};
   const moderateComment=async(id:string,approved:boolean)=>{try{await db.rpc("wedding_invitation_comment_admin",{p_token:auth.token,p_action:"moderate",p_payload:{id,approved}});await loadComments()}catch(e:any){setNotice(e?.message||"Could not update comment.")}};
   const deleteComment=async(id:string)=>{if(!window.confirm("Delete this guest wish permanently?"))return;try{await db.rpc("wedding_invitation_comment_admin",{p_token:auth.token,p_action:"delete",p_payload:{id}});await loadComments()}catch(e:any){setNotice(e?.message||"Could not delete comment.")}};
+  const report=useMemo(()=>buildWeddingGuestReport(payload,rsvpScope==="all"?undefined:rsvpScope),[payload,rsvpScope]);
+  const exportReport=async(format:"pdf"|"xlsx")=>{
+    setExportBusy(true);setNotice("");
+    try{
+      const latest=await call("dashboard");
+      const updated=buildWeddingGuestReport(latest,rsvpScope==="all"?undefined:rsvpScope);
+      if(format==="pdf")downloadWeddingGuestPdf(updated);else await downloadWeddingGuestWorkbook(updated);
+      setNotice(format==="pdf"?"PDF report generated. If a print dialog opens, select Save as PDF.":"Excel guest report downloaded.");
+    }catch(error:any){setNotice(error?.message||"Unable to create guest report.");}
+    finally{setExportBusy(false)}
+  };
   const nav=[["dashboard","Dashboard"],["clients","Clients"],["invitations","Invitations"],["guests","Guest list"],["rsvps","RSVP responses"],["comments","Guest wishes"]];
   if(!auth.ready)return <div className="min-h-screen grid place-items-center bg-stone-950 text-white"><RefreshCw className="animate-spin"/></div>;
   if(!auth.token)return <main className="grid min-h-screen place-items-center bg-[#f5f1e9] px-4"><form onSubmit={auth.login} className="w-full max-w-md rounded-3xl border border-stone-200 bg-white p-8 shadow-2xl">
@@ -391,7 +405,26 @@ function AdminWorkspace(){
       {tab==="guests"&&<section className="mt-5 rounded-2xl border border-stone-200 bg-white p-5"><div className="flex flex-wrap justify-between gap-3"><div><h3 className="font-serif text-xl">Guest directory</h3><p className="text-sm text-stone-500">Guest names, WhatsApp numbers, family groups and notes.</p></div><div className="flex flex-wrap gap-2"><button onClick={()=>exportGuestCsv(selected?.id)} disabled={!selected} className={btn+" border border-stone-200 disabled:opacity-40"}><ExternalLink size={15}/>Download Excel (CSV)</button><button onClick={()=>exportGuestCsv()} disabled={!payload.guests.length} className={btn+" border border-stone-200 disabled:opacity-40"}>Export all guests</button><button disabled={!selected} onClick={()=>setGuest({...blankGuest,invitation_id:selected?.id||""})} className={btn+" bg-[#4b1525] text-white disabled:opacity-40"}><Plus size={15}/>Add guest</button></div></div><label className="mt-4 block text-sm">Invitation<select className={input+" mt-1"} value={selected?.id||""} onChange={e=>setSelectedInvitation(e.target.value)}>{payload.invitations.map((i:any)=><option key={i.id} value={i.id}>{i.bride_name} & {i.groom_name}</option>)}</select></label>
         {selected&&guestsFor(selected.id).map((g:any)=><div key={g.id} className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-100 p-3"><div><p className="font-semibold">{g.guest_name}</p><p className="text-xs text-stone-500">{g.side} side · {g.group_name||"General"} · {g.rsvp_status}</p></div><div className="flex gap-2"><button onClick={()=>void copy(publicUrl(selected)+"?guest="+g.invite_token,"guest-"+g.id)} className="text-sm underline">{copied==="guest-"+g.id?"Copied":"Copy personal link"}</button><button onClick={()=>setGuest({...g})} className="text-sm underline">Edit</button></div></div>)}
       </section>}
-      {tab==="rsvps"&&<section className="mt-5 rounded-2xl border border-stone-200 bg-white p-5"><h3 className="font-serif text-xl">Guest RSVP responses</h3>{payload.rsvps.map((r:any)=><div key={r.id} className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-100 p-4"><div><p className="font-semibold">{r.guest_name}</p><p className="text-xs text-stone-500">{r.phone} · {r.attendance==="attending"?"Attending":"Not attending"} · {r.attendee_count} guests</p>{r.message&&<p className="mt-1 text-sm text-stone-600">{r.message}</p>}</div><button onClick={()=>void save("review_rsvp",{id:r.id,reviewed:!r.reviewed})} className={btn+" border border-stone-200"}>{r.reviewed?"Reviewed":"Mark reviewed"}</button></div>)}</section>}
+      {tab==="rsvps"&&<section className="mt-5 rounded-2xl border border-stone-200 bg-white p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-serif text-xl">Guest RSVP responses & reports</h3><p className="mt-1 text-xs text-stone-500">Guest details, notes, confirmation totals and printable review/check-in marking.</p></div>
+        <label className="text-xs font-semibold text-stone-600">Invitation / client<select className={input+" mt-2"} value={rsvpScope} onChange={e=>setRsvpScope(e.target.value)}><option value="all">All clients</option>{payload.invitations.map((i:any)=><option key={i.id} value={i.id}>{i.bride_name} & {i.groom_name}</option>)}</select></label></div>
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          {[["Invited guest records",report.metrics.registeredGuests],["RSVP responses (contacts)",report.metrics.answered],["Attending (people)",report.metrics.confirmedPeople],["Attending (contacts)",report.metrics.attending],["Declined",report.metrics.declined],["Pending",report.metrics.pending],["Reviewed",report.metrics.marked],["Unreviewed",report.metrics.unmarked]].map(([label,value]:any)=><div key={label} className="rounded-xl border border-[#b69a64]/30 bg-[#faf7ee] p-3"><p className="text-xs text-stone-600">{label}</p><p className="mt-1 font-serif text-2xl font-semibold text-[#5b2928]">{value}</p></div>)}
+        </div>
+        <p className="mt-3 text-xs text-stone-500">Total public submissions: {report.metrics.submissions} · Personal guest-link replies: {report.metrics.personalLinkReplies} · Confirmed people are based on the latest identifiable response; attendance at the venue is not automatically verified.</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button disabled={exportBusy||!report.invitations.length} onClick={()=>void exportReport("pdf")} className={btn+" bg-[#4b1525] text-white disabled:opacity-50"}><ExternalLink size={15}/>{exportBusy?"Preparing report…":"Download PDF report"}</button>
+          <button disabled={exportBusy||!report.invitations.length} onClick={()=>void exportReport("xlsx")} className={btn+" border border-stone-200 bg-white disabled:opacity-50"}><ExternalLink size={15}/>Download Excel (.xlsx)</button>
+        </div>
+        <div className="mt-5 border-t border-stone-200 pt-4"><h4 className="font-serif text-lg">All received responses ({report.responseRows.length})</h4><p className="mt-1 text-xs text-stone-500">Includes guest notes and personal-link responses; repeat submissions remain in the export history.</p></div>
+        {report.responseRows.map((r:any,index:number)=><div key={r.source+"-"+r.name+"-"+r.submitted+"-"+index} className="mt-3 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-stone-100 p-4">
+          <div className="min-w-0 flex-1"><p className="font-semibold">{r.name} <span className="text-xs font-normal text-stone-500">· {r.invitation}</span></p><p className="text-xs text-stone-500">{r.phone} · {r.status} · {r.count} people</p><p className="mt-1 text-xs text-stone-500">{r.event} · {r.submitted}</p>{r.message&&<p className="mt-2 whitespace-pre-wrap text-sm text-stone-600">Guest message: {r.message}</p>}{r.notes&&<p className="mt-1 whitespace-pre-wrap text-xs text-stone-600">Admin notes: {r.notes}</p>}</div>
+          <span className="rounded-lg border border-stone-200 px-2 py-1 text-xs text-stone-600">{r.reviewed}</span>
+        </div>)}
+        {!report.responseRows.length&&<p className="mt-4 text-sm text-stone-500">No responses yet for the selected invitation.</p>}
+        <p className="mt-4 text-xs text-stone-500">Mark reviewed actions remain available on individual public RSVP entries below.</p>
+        {(payload.rsvps||[]).filter((r:any)=>rsvpScope==="all"||r.invitation_id===rsvpScope).map((r:any)=><div key={r.id} className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-stone-50 p-3"><span className="text-xs">{r.guest_name} · {r.reviewed?"Reviewed":"Not reviewed"}</span><button onClick={()=>void save("review_rsvp",{id:r.id,reviewed:!r.reviewed})} className={btn+" border border-stone-200 text-xs"}>{r.reviewed?"Unmark review":"Mark reviewed"}</button></div>)}
+      </section>}
       {tab==="comments"&&<section className="mt-5 rounded-2xl border border-stone-200 bg-white p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-serif text-xl">Guest wishes moderation</h3><p className="text-sm text-stone-500">Approve a message before it appears on the public invitation.</p></div><button onClick={()=>void loadComments()} className={btn+" border border-stone-200"}><RefreshCw size={15}/>Refresh</button></div>{commentLoading&&<p className="mt-4 text-sm">Loading…</p>}{commentRows.map((c:any)=><article key={c.id} className="mt-3 rounded-xl border border-stone-100 p-4"><div className="flex flex-wrap justify-between gap-3"><div><p className="font-semibold">{c.guest_name} <span className="text-xs font-normal text-stone-500">· {c.client_name} · {c.slug}</span></p><p className="mt-2 text-sm text-stone-700">{c.message}</p><p className="mt-2 text-xs text-stone-500">{new Date(c.created_at).toLocaleString()}</p></div><div className="flex gap-2"><button onClick={()=>void moderateComment(c.id,!c.approved)} className={btn+" border border-stone-200"}>{c.approved?"Unpublish":"Approve"}</button><button onClick={()=>void deleteComment(c.id)} className={btn+" border border-red-200 text-red-700"}><Trash2 size={14}/>Delete</button></div></div></article>)}{!commentRows.length&&!commentLoading&&<p className="mt-4 text-sm text-stone-500">No guest wishes yet.</p>}</section>}
     </div>
     {event&&<div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-3"><div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5"><div className="flex justify-between"><h3 className="font-serif text-xl">{event.id?"Edit event":"Add event"}</h3><button onClick={()=>setEvent(null)}><X/></button></div><div className="mt-4 grid gap-3 sm:grid-cols-2">{[
