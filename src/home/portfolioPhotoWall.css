@@ -1,0 +1,78 @@
+.ramya-photo-wall {
+  --photo-height: clamp(5.2rem, 16vw, 8rem);
+  --photo-gap: 0.375rem;
+}
+
+.ramya-photo-row {
+  overflow: hidden;
+  border-radius: 0.55rem;
+}
+
+.ramya-photo-track,
+.ramya-photo-group {
+  display: flex;
+  width: max-content;
+}
+
+.ramya-photo-track {
+  animation: ramya-photo-slide linear infinite;
+}
+
+.ramya-photo-row:nth-child(even) .ramya-photo-track {
+  animation-direction: reverse;
+}
+
+.ramya-photo-wall[data-paused="true"] .ramya-photo-track {
+  animation-play-state: paused;
+}
+
+.ramya-photo-group {
+  flex-shrink: 0;
+  gap: var(--photo-gap);
+  padding-inline-end: var(--photo-gap);
+}
+
+.ramya-photo-group img {
+  display: block;
+  flex: none;
+  width: calc(var(--photo-height) * 1.46);
+  max-width: none;
+  height: var(--photo-height);
+  border-radius: 0.5rem;
+  background-color: #ded3ba;
+  object-fit: cover;
+  object-position: center 42%;
+}
+
+.ramya-photo-group img:nth-child(5n + 2),
+.ramya-photo-group img:nth-child(5n + 5) {
+  width: calc(var(--photo-height) * 0.86);
+}
+
+.ramya-photo-group img:nth-child(5n + 3) {
+  width: calc(var(--photo-height) * 1.17);
+}
+
+.ramya-photo-row:nth-child(even) img:nth-child(5n + 1) {
+  width: var(--photo-height);
+}
+
+@keyframes ramya-photo-slide {
+  to { transform: translateX(-50%); }
+}
+
+@media (min-width: 640px) {
+  .ramya-photo-wall { --photo-gap: 0.5rem; }
+}
+
+@media (hover: hover) {
+  .ramya-photo-rows:hover .ramya-photo-track { animation-play-state: paused; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ramya-photo-row { overflow-x: auto; }
+  .ramya-photo-track { animation: none; }
+  .ramya-photo-group[aria-hidden="true"],
+  .ramya-photo-group img[data-repeat="true"],
+  .ramya-photo-wall .ramya-photo-pause { display: none; }
+}
