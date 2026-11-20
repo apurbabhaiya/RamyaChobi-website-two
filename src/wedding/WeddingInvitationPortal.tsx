@@ -293,15 +293,27 @@ function AdminWorkspace(){
   useEffect(()=>{void refreshMusicLibrary().catch((error:any)=>setNotice(error?.message||"Music library could not load."))},[refreshMusicLibrary]);
   const uploadLibrarySong=async(fileList:FileList|null)=>{
     const file=fileList?.[0];if(!file)return;
-    if(!/\.(mp3|m4a)$/i.test(file.name)||file.size>5*1024*1024||file.size===0){setNotice("Select an MP3 or M4A file, maximum 5 MB.");return;}
-    setMusicLibraryBusy(true);setNotice("");
+    if(!file.size||file.size>5*1024*1024){setNotice("The music file must be smaller than 5 MB.");return;}
+    setMusicLibraryBusy(true);setNotice("Checking audio format and uploading…");
     try{
-      const form=new FormData();form.append("action","upload");form.append("file",file);form.append("title",file.name.replace(/\.(mp3|m4a)$/i,""));
+      // Some Android file managers return MP3 files without a file extension.
+      // Identify the real audio format from its header rather than its filename.
+      const header=new Uint8Array(await file.slice(0,16).arrayBuffer());
+      const hasID3=header[0]===0x49&&header[1]===0x44&&header[2]===0x33;
+      const hasMpegFrame=header[0]===0xff&&(header[1]&0xe0)===0xe0;
+      const hasMp4Header=String.fromCharCode(...header.slice(4,8))==="ftyp";
+      const ext=hasID3||hasMpegFrame?"mp3":hasMp4Header?"m4a":null;
+      if(!ext)throw new Error("This file is not a valid MP3 or M4A. Please choose an audio file.");
+      const displayName=file.name.replace(/\.(mp3|m4a)$/i,"").trim()||"Wedding music";
+      const uploadName=displayName+"."+ext;
+      const normalized=new File([file],uploadName,{type:ext==="mp3"?"audio/mpeg":"audio/mp4"});
+      const form=new FormData();form.append("action","upload");form.append("file",normalized);
+      form.append("title",displayName);
       const result=await musicRequest(form);
       await refreshMusicLibrary();
       setInvitation((old:any)=>old?{...old,music_url:result.song.file_url,music_storage_path:result.song.storage_path}:old);
-      setNotice(result.reused?"This song is already saved. It has been selected for this invitation. Click Save Invitation.":"Song saved to the shared Music Library and selected. Click Save Invitation.");
-    }catch(error:any){setNotice(error?.message||"Music could not be uploaded.")}
+      setNotice(result.reused?"This song is already saved. Selected for this invitation. Click Save Invitation.":"Upload completed. Song added to Music Library. Click Save Invitation.");
+    }catch(error:any){setNotice("Music upload failed: "+(error?.message||"Please retry."))}
     finally{setMusicLibraryBusy(false)}
   };
   const deleteUnusedLibrarySong=async(songId:string)=>{
@@ -435,7 +447,7 @@ function AdminWorkspace(){
               <div><p className="flex items-center gap-2 font-semibold text-[#5a4527]"><Music2 size={17}/>Shared Wedding Music Library</p>
               <p className="mt-1 text-xs text-stone-500">Upload each MP3 once and reuse it in as many invitations as you need. Max 5 MB per file.</p></div>
               <label className={btn+" cursor-pointer bg-[#80663c] text-white"}><Music2 size={16}/>{musicLibraryBusy?"Processing…":"Upload new song"}
-                <input type="file" accept=".mp3,.m4a,audio/mpeg,audio/mp4" disabled={musicLibraryBusy} className="hidden" onChange={e=>{void uploadLibrarySong(e.currentTarget.files);e.currentTarget.value="";}}/>
+                <input type="file" accept="audio/*,audio/mpeg,audio/mp4,.mp3,.m4a" disabled={musicLibraryBusy} className="hidden" onChange={e=>{void uploadLibrarySong(e.currentTarget.files);e.currentTarget.value="";}}/>
               </label>
             </div>
             <label className="mt-4 block text-sm font-semibold text-stone-700">Choose a saved song
