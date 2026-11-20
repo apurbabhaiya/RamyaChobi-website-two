@@ -167,3 +167,40 @@ html:has(.ramya-photo-lightbox[open]) {
   .ramya-photo-tile[data-repeat="true"],
   .ramya-photo-wall .ramya-photo-pause { display: none; }
 }
+
+.ramya-home-photo-background {
+  --photo-gap: 0.25rem;
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  display: grid;
+  grid-template-rows: repeat(8, minmax(0, 1fr));
+  gap: var(--photo-gap);
+  padding: var(--photo-gap);
+  overflow: hidden;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.ramya-home-photo-background .ramya-photo-track,
+.ramya-home-photo-background .ramya-photo-group {
+  height: 100%;
+}
+
+.ramya-home-photo-background .ramya-photo-group img {
+  flex: none;
+  width: var(--home-photo-width);
+  max-width: none;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 42%;
+  border-radius: 0.35rem;
+}
+
+.ramya-home-page:has(#photo-wall[data-paused="true"]) .ramya-home-photo-background .ramya-photo-track {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ramya-home-photo-background .ramya-photo-row { overflow: hidden; }
+}
