@@ -86,7 +86,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           cus_name:name,amount:99,
           metadata:{reference_code:intent.reference_code,product:'RamyaChobi Membership Card'},
           redirect_url:`${base}/wedding-membership?payment=return&reference=${encodeURIComponent(intent.reference_code)}`,
-          cancel_url:`${base}/wedding-membership?payment=cancel&reference=${encodeURIComponent(intent.reference_code)}`
+          cancel_url:`${base}/wedding-membership?payment=cancel&reference=${encodeURIComponent(intent.reference_code)}`,
+          webhook_url:`${base}/api/zinipay-membership?action=webhook`
         })
       });
       const gateway = await created.json().catch(()=>({}));
