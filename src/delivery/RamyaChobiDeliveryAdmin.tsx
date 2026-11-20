@@ -65,6 +65,7 @@ import { directoryDate, filterClientDirectory, type DirectoryDateField, type Dir
 import DeliveryDownloadSettings from './DeliveryDownloadSettings';
 import DeliveryPaymentShortcut from './DeliveryPaymentShortcut';
 import PortfolioManager from '../components/PortfolioManager';
+import HomeVideoManager from '../components/HomeVideoManager';
 import WebsiteTeamManager from '../booking/WebsiteTeamManager';
 import ChatbotAdmin from '../booking/ChatbotAdmin';
 import { BookingDiscussionAdmin, CustomPackageAdmin } from '../booking/CustomPackages';
@@ -934,6 +935,7 @@ export default function RamyaChobiDeliveryAdmin() {
             </button>
           ))}
           <a href="/booking/admin" className="flex min-h-11 items-center rounded-xl bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white">ক্লায়েন্ট ও হিসাব</a>
+          <button type="button" aria-current={adminSection === 'home-video' ? 'page' : undefined} onClick={() => setAdminSection('home-video')} className={`flex min-h-11 items-center rounded-xl px-4 py-2.5 text-sm font-semibold ${adminSection === 'home-video' ? 'bg-emerald-800 text-white' : 'bg-emerald-50 text-emerald-900'}`}>হোমপেজ ভিডিও</button>
           <button type="button" aria-current={adminSection === 'booking-discounts' ? 'page' : undefined} onClick={() => setAdminSection('booking-discounts')} className={`flex min-h-11 items-center rounded-xl px-4 py-2.5 text-sm font-semibold ${adminSection === 'booking-discounts' ? 'bg-emerald-800 text-white' : 'bg-emerald-50 text-emerald-900'}`}>বুকিং / ডিসকাউন্ট</button>
           <button type="button" aria-current={adminSection === 'chat-replies' ? 'page' : undefined} onClick={() => setAdminSection('chat-replies')} className={`flex min-h-11 items-center rounded-xl px-4 py-2.5 text-sm font-semibold ${adminSection === 'chat-replies' ? 'bg-emerald-800 text-white' : 'bg-emerald-50 text-emerald-900'}`}>চ্যাটের উত্তর</button>
           <button type="button" aria-current={adminSection === 'discussion-requests' ? 'page' : undefined} onClick={() => setAdminSection('discussion-requests')} className={`flex min-h-11 items-center rounded-xl px-4 py-2.5 text-sm font-semibold ${adminSection === 'discussion-requests' ? 'bg-emerald-800 text-white' : 'bg-emerald-50 text-emerald-900'}`}>আলোচনার অনুরোধ</button>
@@ -988,6 +990,7 @@ export default function RamyaChobiDeliveryAdmin() {
         )}
 
         {adminSection === 'portfolio' && <PortfolioManager adminToken={token} />}
+        {adminSection === 'home-video' && <HomeVideoManager adminToken={token} />}
         {adminSection === 'team' && <WebsiteTeamManager adminToken={token} />}
         {adminSection === 'spin-results' && <SpinResultAdmin adminToken={token} />}
 
