@@ -265,6 +265,8 @@ function AdminWorkspace(){
   const [commentLoading,setCommentLoading]=useState(false);
   const [rsvpScope,setRsvpScope]=useState("all");
   const [exportBusy,setExportBusy]=useState(false);
+  const [musicLibrary,setMusicLibrary]=useState<any[]>([]);
+  const [musicLibraryBusy,setMusicLibraryBusy]=useState(false);
   const call=useCallback(async(action:string,payloadValue:any={})=>{
     const {data,error}=await db.rpc("wedding_invitation_admin",{p_token:auth.token,p_action:action,p_payload:payloadValue});
     if(error)throw error;return data;
@@ -276,6 +278,39 @@ function AdminWorkspace(){
     finally{setLoading(false);}
   },[auth.token,call]);
   useEffect(()=>{void refresh()},[refresh]);
+  const musicRequest=useCallback(async(data:FormData)=>{
+    const response=await fetch(SUPABASE_URL+"/functions/v1/wedding-music-library",{method:"POST",headers:{"x-admin-token":auth.token},body:data});
+    const result=await response.json().catch(()=>null);
+    if(!response.ok||!result?.success)throw new Error(result?.error||"Music library request failed.");
+    return result;
+  },[auth.token]);
+  const refreshMusicLibrary=useCallback(async()=>{
+    if(!auth.token)return;
+    const form=new FormData();form.append("action","list");
+    const result=await musicRequest(form);
+    setMusicLibrary(result.songs||[]);
+  },[auth.token,musicRequest]);
+  useEffect(()=>{void refreshMusicLibrary().catch((error:any)=>setNotice(error?.message||"Music library could not load."))},[refreshMusicLibrary]);
+  const uploadLibrarySong=async(fileList:FileList|null)=>{
+    const file=fileList?.[0];if(!file)return;
+    if(!/\.(mp3|m4a)$/i.test(file.name)||file.size>5*1024*1024||file.size===0){setNotice("Select an MP3 or M4A file, maximum 5 MB.");return;}
+    setMusicLibraryBusy(true);setNotice("");
+    try{
+      const form=new FormData();form.append("action","upload");form.append("file",file);form.append("title",file.name.replace(/\.(mp3|m4a)$/i,""));
+      const result=await musicRequest(form);
+      await refreshMusicLibrary();
+      setInvitation((old:any)=>old?{...old,music_url:result.song.file_url,music_storage_path:result.song.storage_path}:old);
+      setNotice(result.reused?"This song is already saved. It has been selected for this invitation. Click Save Invitation.":"Song saved to the shared Music Library and selected. Click Save Invitation.");
+    }catch(error:any){setNotice(error?.message||"Music could not be uploaded.")}
+    finally{setMusicLibraryBusy(false)}
+  };
+  const deleteUnusedLibrarySong=async(songId:string)=>{
+    if(!window.confirm("Delete this unused song from the shared Music Library? It will only work when no invitations are using it."))return;
+    setMusicLibraryBusy(true);setNotice("");
+    try{const form=new FormData();form.append("action","delete");form.append("id",songId);await musicRequest(form);await refreshMusicLibrary();setNotice("Unused song deleted from the Music Library.")}
+    catch(error:any){setNotice(error?.message||"Could not delete this song.")}
+    finally{setMusicLibraryBusy(false)}
+  };
   const selected=payload.invitations.find((i:any)=>i.id===selectedInvitation)||payload.invitations[0];
   const save=async(action:string,value:any)=>{
     try{await call(action,value);setNotice("Saved successfully.");await refresh();setClient(null);setInvitation(null);setEvent(null);setGuest(null);}
@@ -395,7 +430,33 @@ function AdminWorkspace(){
           <label className="text-sm sm:col-span-2">Welcome message (English)<textarea rows={3} className={input+" mt-1"} value={invitation.welcome_message} onChange={e=>setInvitation({...invitation,welcome_message:e.target.value})}/></label><label className="text-sm sm:col-span-2">Welcome message (বাংলা)<textarea rows={3} className={input+" mt-1"} value={invitation.welcome_message_bn||""} onChange={e=>setInvitation({...invitation,welcome_message_bn:e.target.value})}/></label>
           <div className="sm:col-span-2 rounded-xl border border-stone-200 bg-stone-50 p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">Cover Photo</p><p className="text-xs text-stone-500">Main invitation banner · JPG, PNG, WEBP or AVIF · Max 15 MB</p></div><label className={btn+" cursor-pointer bg-[#4b1525] text-white"}><ImagePlus size={16}/>{uploading==="cover"?"Uploading…":"Upload Cover Photo"}<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="hidden" disabled={!!uploading} onChange={e=>{void uploadPhotos("cover",e.currentTarget.files);e.currentTarget.value="";}}/></label></div>{invitation.cover_image_url&&<img src={invitation.cover_image_url} alt="Cover photo preview" className="mt-3 max-h-56 w-full rounded-lg object-cover"/>}<label className="mt-3 block text-xs text-stone-500">Or paste an image URL<input className={input+" mt-1"} placeholder="https://…" value={invitation.cover_image_url} onChange={e=>setInvitation({...invitation,cover_image_url:e.target.value})}/></label></div>
           <div className="sm:col-span-2 rounded-xl border border-stone-200 bg-stone-50 p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">Couple Photo</p><p className="text-xs text-stone-500">Main photo of the bride and groom · Max 15 MB</p></div><label className={btn+" cursor-pointer bg-[#4b1525] text-white"}><ImagePlus size={16}/>{uploading==="couple"?"Uploading…":"Upload Couple Photo"}<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="hidden" disabled={!!uploading} onChange={e=>{void uploadPhotos("couple",e.currentTarget.files);e.currentTarget.value="";}}/></label></div>{invitation.couple_photo_url&&<img src={invitation.couple_photo_url} alt="Couple photo preview" className="mt-3 max-h-64 w-full rounded-lg object-cover"/>}<label className="mt-3 block text-xs text-stone-500">Or paste an image URL<input className={input+" mt-1"} placeholder="https://…" value={invitation.couple_photo_url} onChange={e=>setInvitation({...invitation,couple_photo_url:e.target.value})}/></label></div>
-          <div className="sm:col-span-2 rounded-xl border border-[#b69a64]/40 bg-[#fffdf8] p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="flex items-center gap-2 font-semibold text-[#5a4527]"><Music2 size={17}/>Wedding Background Music</p><p className="mt-1 text-xs text-stone-500">One soundtrack for this invitation · MP3 or M4A · Maximum 5 MB. A new upload replaces the previous track.</p></div><label className={btn+" cursor-pointer bg-[#80663c] text-white"}><Music2 size={16}/>{uploading==="music"?"Uploading…":invitation.music_url?"Replace song":"Upload song"}<input type="file" accept=".mp3,.m4a,audio/mpeg,audio/mp4" className="hidden" disabled={!!uploading||!invitation.id} onChange={e=>{void uploadPhotos("music",e.currentTarget.files);e.currentTarget.value="";}}/></label></div>{!invitation.id&&<p className="mt-2 text-xs text-amber-800">Save the invitation first, then upload its music.</p>}{invitation.music_url&&<div className="mt-3 rounded-lg bg-white p-3"><audio controls preload="none" src={invitation.music_url} className="w-full"/><button type="button" onClick={async()=>{if(!invitation.music_storage_path){setNotice("This song uses an external URL and cannot be removed from storage here.");return;}try{const form=new FormData();form.append("action","delete");form.append("path",invitation.music_storage_path);const response=await fetch(SUPABASE_URL+"/functions/v1/wedding-invitation-media",{method:"POST",headers:{"x-admin-token":auth.token},body:form});const result=await response.json();if(!response.ok)throw new Error(result?.error||"Could not remove music.");setInvitation({...invitation,music_url:"",music_storage_path:""});setNotice("Wedding music removed. Save invitation to confirm.");}catch(e:any){setNotice(e?.message||"Could not remove music.");}}} className="mt-2 text-xs font-semibold text-red-700 underline">Remove song</button></div>}</div>
+          <div className="sm:col-span-2 rounded-xl border border-[#b69a64]/40 bg-[#fffdf8] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div><p className="flex items-center gap-2 font-semibold text-[#5a4527]"><Music2 size={17}/>Shared Wedding Music Library</p>
+              <p className="mt-1 text-xs text-stone-500">Upload each MP3 once and reuse it in as many invitations as you need. Max 5 MB per file.</p></div>
+              <label className={btn+" cursor-pointer bg-[#80663c] text-white"}><Music2 size={16}/>{musicLibraryBusy?"Processing…":"Upload new song"}
+                <input type="file" accept=".mp3,.m4a,audio/mpeg,audio/mp4" disabled={musicLibraryBusy} className="hidden" onChange={e=>{void uploadLibrarySong(e.currentTarget.files);e.currentTarget.value="";}}/>
+              </label>
+            </div>
+            <label className="mt-4 block text-sm font-semibold text-stone-700">Choose a saved song
+              <select className={input+" mt-2"} disabled={musicLibraryBusy} value={musicLibrary.find((song:any)=>song.file_url===invitation.music_url)?.id||""} onChange={e=>{
+                const song=musicLibrary.find((item:any)=>item.id===e.target.value);
+                setInvitation({...invitation,music_url:song?.file_url||"",music_storage_path:song?.storage_path||""});
+                setNotice(song?"Song selected. Click Save Invitation to apply it.":"Song unlinked from this invitation. Click Save Invitation.");
+              }}><option value="">No background music</option>{musicLibrary.map((song:any)=><option key={song.id} value={song.id}>{song.title} ({Math.max(.01,(Number(song.file_size_bytes)||0)/1048576).toFixed(2)} MB)</option>)}</select>
+            </label>
+            {invitation.music_url&&<div className="mt-3 rounded-lg border border-[#b69a64]/30 bg-white p-3">
+              <audio key={invitation.music_url} controls preload="none" src={invitation.music_url} className="w-full"/>
+              <button type="button" className="mt-2 text-xs font-semibold text-[#7c3434] underline" onClick={()=>{setInvitation({...invitation,music_url:"",music_storage_path:""});setNotice("Music removed from this invitation only. The song remains saved in your library. Click Save Invitation.");}}>Remove from this invitation</button>
+            </div>}
+            {musicLibrary.length>0&&<details className="mt-4 rounded-lg border border-stone-200 bg-white p-3"><summary className="cursor-pointer text-xs font-semibold text-stone-600">Manage saved songs ({musicLibrary.length})</summary>
+              <div className="mt-3 space-y-2">{musicLibrary.map((song:any)=><div key={song.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-2 text-xs">
+                <span className="min-w-0 flex-1 break-words">{song.title}</span>
+                <button type="button" disabled={musicLibraryBusy} onClick={()=>void deleteUnusedLibrarySong(song.id)} className="font-semibold text-red-700 underline disabled:opacity-50">Delete if unused</button>
+              </div>)}</div>
+            </details>}
+            <p className="mt-3 text-xs text-stone-500">Selecting, changing or unlinking music never deletes a song used by another invitation. Save Invitation after any change.</p>
+          </div>
           <label className="text-sm">RSVP deadline<input type="date" className={input+" mt-1"} value={invitation.rsvp_deadline||""} onChange={e=>setInvitation({...invitation,rsvp_deadline:e.target.value})}/></label><label className="text-sm">Dress code (English)<input className={input+" mt-1"} value={invitation.dress_code} onChange={e=>setInvitation({...invitation,dress_code:e.target.value})}/></label><label className="text-sm">Dress code (বাংলা)<input className={input+" mt-1"} value={invitation.dress_code_bn||""} onChange={e=>setInvitation({...invitation,dress_code_bn:e.target.value})}/></label>
           <div className="sm:col-span-2 rounded-xl border border-stone-200 bg-stone-50 p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">Gallery Photos</p><p className="text-xs text-stone-500">Upload multiple photos together · Up to 30 photos total · Max 15 MB each</p></div><label className={btn+" cursor-pointer bg-[#4b1525] text-white"}><ImagePlus size={16}/>{uploading==="gallery"?"Uploading…":"Upload Gallery Photos"}<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple className="hidden" disabled={!!uploading} onChange={e=>{void uploadPhotos("gallery",e.currentTarget.files);e.currentTarget.value="";}}/></label></div>{(invitation.gallery_images||[]).length>0&&<div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">{invitation.gallery_images.map((url:string,index:number)=><div key={url+index} className="overflow-hidden rounded-lg border border-stone-200 bg-white"><img src={url} alt={"Gallery preview "+(index+1)} className="aspect-[3/4] w-full object-cover"/><p className="p-2 text-xs text-stone-500">Photo {index+1}</p></div>)}</div>}<label className="mt-3 block text-xs text-stone-500">Or paste image URLs (one per line)<textarea rows={3} className={input+" mt-1"} value={(invitation.gallery_images||[]).join("\n")} onChange={e=>setInvitation({...invitation,gallery_images:e.target.value.split("\n").map((v:string)=>v.trim()).filter(Boolean).slice(0,30)})}/></label></div>
           <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={invitation.show_countdown} onChange={e=>setInvitation({...invitation,show_countdown:e.target.checked})}/>Show live wedding countdown timer</label>
