@@ -1,11 +1,13 @@
-import { useState } from 'react';
-import { Pause, Play } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Pause, Play, X } from 'lucide-react';
 import './portfolioPhotoWall.css';
 
 type Photo = { image: string; title: string };
 
 export default function PortfolioPhotoWall({ photos }: { photos: Photo[] }) {
   const [paused, setPaused] = useState(false);
+  const [selected, setSelected] = useState<Photo | null>(null);
+  const lightbox = useRef<HTMLDialogElement>(null);
   const unique = [...new Map(photos.map(photo => [photo.image, photo])).values()];
   const rows: Photo[][] = Array.from({ length: Math.min(4, unique.length) }, () => []);
   unique.forEach((photo, index) => rows[index % rows.length].push(photo));
@@ -13,7 +15,7 @@ export default function PortfolioPhotoWall({ photos }: { photos: Photo[] }) {
   if (!rows.length) return null;
 
   return (
-    <section id="photo-wall" aria-label="রম্যছবির ছবির গ্যালারি" data-paused={paused || unique.length === 1}
+    <section id="photo-wall" aria-label="রম্যছবির ছবির গ্যালারি" data-paused={paused || !!selected || unique.length === 1}
       className="ramya-photo-wall relative mx-auto mb-8 max-w-6xl px-4 sm:px-6 md:mb-12">
       <div className="overflow-hidden rounded-2xl border border-[#19382e]/10 bg-[#e9e1cb] p-1.5 sm:rounded-3xl sm:p-2">
         <div className="ramya-photo-rows grid gap-1.5 sm:gap-2">
@@ -26,11 +28,21 @@ export default function PortfolioPhotoWall({ photos }: { photos: Photo[] }) {
                 <div className="ramya-photo-track" style={{ animationDuration: duration }}>
                   {[false, true].map(copy => (
                     <div className="ramya-photo-group" key={String(copy)} aria-hidden={copy || undefined}>
-                      {tiles.map(({ image, title }, tileIndex) => (
-                        <img key={tileIndex} src={image} alt={copy || tileIndex >= row.length ? '' : title}
-                          data-repeat={tileIndex >= row.length || undefined}
-                          loading="lazy" decoding="async" fetchPriority="low" draggable={false} />
-                      ))}
+                      {tiles.map((photo, tileIndex) => {
+                        const repeated = copy || tileIndex >= row.length;
+                        return (
+                          <button key={tileIndex} type="button" className="ramya-photo-tile"
+                            aria-label={photo.title ? photo.title + ' — বড় করে দেখুন' : 'ছবি বড় করে দেখুন'}
+                            aria-hidden={repeated || undefined} tabIndex={repeated ? -1 : undefined}
+                            data-repeat={tileIndex >= row.length || undefined}
+                            onClick={() => {
+                              setSelected(photo);
+                              lightbox.current?.showModal();
+                            }}>
+                            <img src={photo.image} alt="" loading="lazy" decoding="async" fetchPriority="low" draggable={false} />
+                          </button>
+                        );
+                      })}
                     </div>
                   ))}
                 </div>
@@ -46,6 +58,17 @@ export default function PortfolioPhotoWall({ photos }: { photos: Photo[] }) {
           </button>
         )}
       </div>
+      <dialog ref={lightbox} className="ramya-photo-lightbox" aria-label="বড় করে ছবি দেখুন"
+        onClose={() => setSelected(null)}
+        onClick={event => {
+          if (event.target === event.currentTarget) lightbox.current?.close();
+        }}>
+        <button type="button" className="ramya-photo-lightbox-close" aria-label="ছবি বন্ধ করুন"
+          onClick={() => lightbox.current?.close()}>
+          <X aria-hidden="true" size={24} />
+        </button>
+        {selected && <img src={selected.image} alt={selected.title} decoding="async" />}
+      </dialog>
     </section>
   );
 }
