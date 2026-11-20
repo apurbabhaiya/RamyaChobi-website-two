@@ -2,7 +2,7 @@ type VercelRequest = any;
 type VercelResponse = any;
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
 const INTERNAL_SECRET = process.env.RAMYACHOBI_MEMBERSHIP_INTERNAL_SECRET || '';
 const ZINIPAY_API_KEY = process.env.ZINIPAY_API_KEY || '';
 const BASE_URL = 'https://api.zinipay.com';
