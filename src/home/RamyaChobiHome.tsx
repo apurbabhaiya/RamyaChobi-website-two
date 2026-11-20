@@ -11,7 +11,6 @@ const links=[{label:'হোম',href:'/#home',icon:Home},{label:'সহজ ব�
 const focus='focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700';
 const homeVideos=[
   {id:'1469416288442432',title:'বিয়ের গল্প'},
-  {id:'1332488268944377',title:'রিসেপশনের গল্প'},
   {id:'4448012532088003',title:'সকালে বৃদ্ধির সাজে'},
 ];
 
@@ -32,7 +31,7 @@ export default function RamyaChobiHome(){
      <h2 id="home-videos-title" className="text-2xl font-bold">রম্যছবির ভিডিও</h2>
      <a href="https://www.facebook.com/RamyaChobi/videos/" className={'inline-flex min-h-11 items-center text-sm font-semibold text-emerald-900 underline underline-offset-4 '+focus} target="_blank" rel="noopener noreferrer">সব ভিডিও দেখুন</a>
    </div>
-   <div className="grid gap-4 md:grid-cols-3">
+   <div className="grid gap-4 md:grid-cols-2">
      {homeVideos.map(({id,title})=>{
        const videoUrl='https://www.facebook.com/61560914911184/videos/'+id;
        return <article key={id} className="overflow-hidden rounded-2xl border border-[#19382e]/10 bg-white">
