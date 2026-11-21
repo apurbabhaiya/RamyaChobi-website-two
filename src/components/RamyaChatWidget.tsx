@@ -173,7 +173,15 @@ export default function RamyaChatWidget() {
     setStatus(language === 'bn' ? 'English selected' : 'বাংলা নির্বাচন করা হয়েছে');
   }
 
-  if (!visible) return null;
+  if (!visible) return <div className="ramya-chat-widget-dock">
+    <button
+      type="button"
+      className="ramya-voice-launcher"
+      onClick={() => setVisible(true)}
+      aria-label="RamyaChobi Voice Assistant আবার খুলুন"
+      title="Open RamyaChobi Assistant"
+    >🎙</button>
+  </div>;
 
   const suggestions = language === 'bn' ? banglaSuggestions : englishSuggestions;
 
