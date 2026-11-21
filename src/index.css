@@ -134,3 +134,211 @@
   .customer-gallery-actions button[title="Enable Gallery"]::after { content: "Enable"; }
   .customer-gallery-actions button[title="Delete gallery"]::after { content: "Delete"; }
 }
+
+
+/* Separate floating voice assistant, positioned above the existing chat bot. */
+.ramya-voice-widget-dock {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: 140px;
+  z-index: 10001;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  max-width: calc(100vw - 32px);
+  font-family: inherit;
+}
+.ramya-voice-widget-dock button:focus-visible,
+.ramya-voice-widget-dock a:focus-visible {
+  outline: 3px solid #b28748;
+  outline-offset: 3px;
+}
+@media (max-width: 767px) {
+  .ramya-voice-widget-dock {
+    bottom: calc(205px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Compact voice assistant layer. */
+.ramya-voice-compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  max-width: calc(100vw - 24px);
+  min-height: 58px;
+  padding: 7px 9px 7px 11px;
+  border: 1px solid #d8d9c9;
+  border-radius: 18px;
+  background: rgba(255, 253, 242, .96);
+  color: #193e32;
+  box-shadow: 0 5px 22px #0002;
+  backdrop-filter: blur(10px);
+}
+.ramya-voice-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.ramya-voice-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 31px;
+  height: 31px;
+  flex: 0 0 31px;
+  border-radius: 50%;
+  background: #193e32;
+  color: #e8d3a2;
+  font-size: 17px;
+}
+.ramya-voice-brand-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+.ramya-voice-brand-copy strong {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ramya-voice-brand-copy small {
+  max-width: 112px;
+  overflow: hidden;
+  color: #66736b;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ramya-voice-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+.ramya-voice-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  min-height: 34px;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.ramya-voice-language {
+  padding: 0 7px;
+  border-radius: 12px !important;
+  background: #eee9da;
+  color: #193e32;
+  font-size: 10px;
+  font-weight: 700;
+}
+.ramya-voice-mic {
+  background: #193e32;
+  color: #fff;
+  font-size: 15px;
+}
+.ramya-voice-mic.is-listening {
+  background: #a83c35;
+  animation: ramya-voice-pulse 1.2s ease-in-out infinite;
+}
+.ramya-voice-mic:disabled {
+  opacity: .55;
+  cursor: wait;
+}
+.ramya-voice-chat {
+  background: #e9eee8;
+  color: #193e32;
+  font-size: 14px;
+}
+.ramya-voice-close {
+  min-width: 27px !important;
+  min-height: 27px !important;
+  background: transparent;
+  color: #66736b;
+  font-size: 20px;
+}
+.ramya-voice-reply {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  width: 260px;
+  max-width: calc(100vw - 24px);
+  max-height: 100px;
+  margin-bottom: 8px;
+  padding: 9px 8px 9px 11px;
+  overflow: hidden;
+  border: 1px solid #d8d9c9;
+  border-radius: 14px;
+  background: rgba(255, 253, 242, .97);
+  color: #193e32;
+  box-shadow: 0 4px 18px #0002;
+}
+.ramya-voice-reply p {
+  display: -webkit-box;
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+.ramya-voice-reply button {
+  min-width: 27px;
+  min-height: 27px;
+  border: 0;
+  border-radius: 8px;
+  background: #e9eee8;
+  color: #193e32;
+  font-size: 10px;
+  cursor: pointer;
+}
+.ramya-voice-reply button:last-child {
+  min-width: 22px;
+  min-height: 22px;
+  background: transparent;
+  font-size: 16px;
+}
+@keyframes ramya-voice-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 #a83c3544; }
+  50% { box-shadow: 0 0 0 6px #a83c3518; }
+}
+@media (max-width: 420px) {
+  .ramya-voice-compact { gap: 5px; padding-left: 8px; padding-right: 6px; }
+  .ramya-voice-brand { gap: 6px; }
+  .ramya-voice-brand-copy small { max-width: 82px; }
+  .ramya-voice-actions { gap: 3px; }
+  .ramya-voice-actions button { min-width: 32px; min-height: 32px; }
+}
+
+
+/* Persistent assistant launcher remains visible after minimizing. */
+.ramya-voice-launcher {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border: 2px solid #e8d3a2;
+  border-radius: 50%;
+  background: #193e32;
+  color: #fff;
+  font-size: 23px;
+  box-shadow: 0 5px 22px #0004;
+  cursor: pointer;
+  animation: ramya-voice-launcher-in .22s ease-out;
+}
+.ramya-voice-launcher:focus-visible {
+  outline: 3px solid #b28748;
+  outline-offset: 3px;
+}
+@keyframes ramya-voice-launcher-in {
+  from { opacity: .65; transform: scale(.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+
