@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import RamyaChatWidget from "./components/RamyaChatWidget";
+import RamyaVoiceAssistant from "./components/RamyaVoiceAssistant";
 import LegacyApp from "./App";
 import BookingPortal from "./booking/BookingPortal";
 import PublicDeliveryAlbums from "./delivery/PublicDeliveryAlbums";
@@ -17,7 +18,18 @@ import SpinResultSubmission from "./home/SpinResultSubmission";
 import WeddingMembershipPage from "./home/WeddingMembershipPage";
 import WeddingInvitationPortal from "./wedding/WeddingInvitationPortal";
 
-const withChat = (page: React.ReactNode) => /^(\/booking\/admin|\/delivery-admin|\/invitation-admin|\/studio)(\/|$)/.test(window.location.pathname) ? <>{page}</> : <>{page}<RamyaChatWidget /></>;
+const withChat = (page: React.ReactNode) => {
+  const path = window.location.pathname;
+  const isAdmin = path.startsWith("/booking/admin") || path.startsWith("/delivery-admin") || path.startsWith("/invitation-admin") || path === "/studio" || path.startsWith("/studio/");
+  const introDone = new URLSearchParams(window.location.search).get("intro") === "done";
+  let introSeen = false;
+  try { introSeen = window.sessionStorage.getItem("ramyachobi_intro_seen") === "1"; } catch { /* storage may be unavailable */ }
+  const isIntroGate = path === "/" && !introDone && !introSeen;
+  const isIntroDocument = path === "/ramyachobi-intro.html" || path.startsWith("/ramyachobi-intro/");
+  return isAdmin || isIntroGate || isIntroDocument
+    ? <>{page}</>
+    : <>{page}<RamyaVoiceAssistant /><RamyaChatWidget /></>;
+};
 
 export default function RouterApp() {
   const path = window.location.pathname;
