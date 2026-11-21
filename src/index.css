@@ -215,6 +215,32 @@
   .ramya-voice-actions button { min-width: 32px; min-height: 32px; }
 }
 
+
+/* Persistent assistant launcher remains visible after minimizing. */
+.ramya-voice-launcher {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border: 2px solid #e8d3a2;
+  border-radius: 50%;
+  background: #193e32;
+  color: #fff;
+  font-size: 23px;
+  box-shadow: 0 5px 22px #0004;
+  cursor: pointer;
+  animation: ramya-voice-launcher-in .22s ease-out;
+}
+.ramya-voice-launcher:focus-visible {
+  outline: 3px solid #b28748;
+  outline-offset: 3px;
+}
+@keyframes ramya-voice-launcher-in {
+  from { opacity: .65; transform: scale(.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 /* Mobile controls for the photo-selection admin panel. */
 @media (max-width: 639px) {
   .admin-header-actions {
