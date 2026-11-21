@@ -19,7 +19,7 @@ import WeddingInvitationPortal from "./wedding/WeddingInvitationPortal";
 
 const withChat = (page: React.ReactNode) => {
   const path = window.location.pathname;
-  const isAdmin = /^(\\/booking\\/admin|\\/delivery-admin|\\/invitation-admin|\\/studio)(\\/|$)/.test(path);
+  const isAdmin = path.startsWith("/booking/admin") || path.startsWith("/delivery-admin") || path.startsWith("/invitation-admin") || path === "/studio" || path.startsWith("/studio/");
   const introDone = new URLSearchParams(window.location.search).get("intro") === "done";
   let introSeen = false;
   try { introSeen = window.sessionStorage.getItem("ramyachobi_intro_seen") === "1"; } catch { /* storage may be unavailable */ }
