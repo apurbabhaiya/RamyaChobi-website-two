@@ -3,12 +3,19 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "types": ["node"],
-    "lib": ["ES2022", "DOM"],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
     "esModuleInterop": true,
     "skipLibCheck": true,
     "strict": false
   },
-  "include": ["**/*.ts"],
-  "exclude": ["**/*.test.ts", "node_modules"]
+  "include": [
+    "**/*.ts"
+  ],
+  "exclude": [
+    "**/*.test.ts",
+    "node_modules"
+  ]
 }
