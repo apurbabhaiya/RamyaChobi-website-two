@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '../services/supabase';
 
 type Message = { role: 'assistant' | 'user'; text: string; links?: { label: string; href: string }[] };
 type VoiceLanguage = 'bn' | 'en';
@@ -71,9 +72,9 @@ export default function RamyaChatWidget() {
     setStatus(responseLanguage === 'bn' ? 'উত্তর তৈরি হচ্ছে…' : 'Preparing an answer…');
 
     try {
-      const response = await fetch('/api/voice-chat', {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/public-voice-chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', apikey: SUPABASE_PUBLISHABLE_KEY },
         body: JSON.stringify({ message: question, history: previousHistory, language: responseLanguage }),
       });
       const data = await response.json().catch(() => ({}));
