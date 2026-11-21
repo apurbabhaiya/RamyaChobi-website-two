@@ -1,6 +1,5 @@
 import React, { useEffect } from "react";
 import RamyaChatWidget from "./components/RamyaChatWidget";
-import RamyaVoiceAssistant from "./components/RamyaVoiceAssistant";
 import LegacyApp from "./App";
 import BookingPortal from "./booking/BookingPortal";
 import PublicDeliveryAlbums from "./delivery/PublicDeliveryAlbums";
@@ -28,7 +27,7 @@ const withChat = (page: React.ReactNode) => {
   const isIntroDocument = path === "/ramyachobi-intro.html" || path.startsWith("/ramyachobi-intro/");
   return isAdmin || isIntroGate || isIntroDocument
     ? <>{page}</>
-    : <>{page}<RamyaVoiceAssistant /><RamyaChatWidget /></>;
+    : <>{page}<RamyaChatWidget /></>;
 };
 
 export default function RouterApp() {
