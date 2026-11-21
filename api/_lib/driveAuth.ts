@@ -1,5 +1,17 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 
+const productionOrigin = 'https://ramyachobi-website-two.vercel.app';
+
+export function getDriveOAuthRedirectUri() {
+  if (process.env.GOOGLE_OAUTH_REDIRECT_URI?.trim()) {
+    return new URL(process.env.GOOGLE_OAUTH_REDIRECT_URI.trim()).toString();
+  }
+  return new URL('/api/drive-oauth-callback', process.env.APP_URL?.trim() || productionOrigin).toString();
+}
+
+export class DeliveryAdminAuthError extends Error {}
+export class DriveReconnectError extends Error {}
+
 function supabaseConfig() {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '';
@@ -43,14 +55,20 @@ async function serviceRequest(path: string, init: RequestInit = {}) {
 }
 
 export async function assertDeliveryAdmin(adminToken: string) {
-  if (!adminToken || adminToken.length > 256) throw new Error('Admin session is required.');
+  if (!adminToken || adminToken.length > 256) throw new DeliveryAdminAuthError('Admin session is required.');
   const { url, key } = supabaseConfig();
   const response = await fetch(`${url}/rest/v1/rpc/delivery_admin_dashboard`, {
     method: 'POST',
     headers: { apikey: key, Authorization: `Bearer ${key}`, 'content-type': 'application/json' },
     body: JSON.stringify({ p_token: adminToken }),
   });
-  if (!response.ok) throw new Error('Admin session expired or invalid.');
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    if (/session expired|invalid admin|admin session/i.test(String(error?.message || ''))) {
+      throw new DeliveryAdminAuthError('Admin session expired or invalid.');
+    }
+    throw new Error('Could not verify the delivery admin session. Check the protected server configuration.');
+  }
 }
 
 export async function getDriveConnection() {
@@ -74,7 +92,7 @@ export async function getDriveAccessToken() {
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data?.access_token) {
-    if (String(data?.error || '') === 'invalid_grant') throw new Error('Google Drive authorization expired. Reconnect the Google account.');
+    if (String(data?.error || '') === 'invalid_grant') throw new DriveReconnectError('Google Drive authorization expired. Reconnect the Google account.');
     throw new Error('Google Drive could not refresh its server connection. Reconnect the Google account.');
   }
   return String(data.access_token);

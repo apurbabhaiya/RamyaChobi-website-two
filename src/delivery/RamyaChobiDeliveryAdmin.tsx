@@ -143,7 +143,10 @@ function StatusPill({ value }: { value: string }) {
 }
 
 export default function RamyaChobiDeliveryAdmin() {
-  const [adminSection, setAdminSection] = useState('delivery');
+  const [adminSection, setAdminSection] = useState(() => {
+    const query = new URLSearchParams(window.location.search);
+    return query.get('tab') === 'settings' || query.has('drive') ? 'settings' : 'delivery';
+  });
   const [portalSections, setPortalSections] = useState<Record<string, string>>({});
   const [paymentFocusId, setPaymentFocusId] = useState('');
   useEffect(() => {

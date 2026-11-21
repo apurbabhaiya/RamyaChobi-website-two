@@ -8,6 +8,7 @@ export default function DriveConnectionCard({ adminToken }: { adminToken: string
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState('');
+  const [callback, setCallback] = useState<{ success: boolean; message: string } | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true); setError('');
@@ -24,16 +25,16 @@ export default function DriveConnectionCard({ adminToken }: { adminToken: string
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
     if (query.get('drive') === 'connected' || query.get('drive') === 'error') {
-      if (query.get('drive') === 'error') setError(query.get('driveError') || 'Google Drive connection failed.');
-      void refresh();
+      const success = query.get('drive') === 'connected';
+      setCallback({ success, message: success ? 'Google Drive authorization saved.' : query.get('driveError') || 'Google Drive connection failed.' });
       query.delete('drive'); query.delete('driveError');
       const next = `${window.location.pathname}${query.size ? `?${query}` : ''}${window.location.hash}`;
       window.history.replaceState({}, '', next);
     }
-  }, [refresh]);
+  }, []);
 
   async function connect() {
-    setConnecting(true); setError('');
+    setConnecting(true); setError(''); setCallback(null);
     try {
       const response = await fetch('/api/drive-oauth-start', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ adminToken }) });
       const result = await response.json().catch(() => ({}));
@@ -52,6 +53,7 @@ export default function DriveConnectionCard({ adminToken }: { adminToken: string
           <div className="min-w-0">
             <div className="text-xs font-bold uppercase tracking-[.16em] text-stone-500">Google Drive · Server connection</div>
             {loading ? <div className="mt-1 flex items-center gap-2 text-sm text-stone-500"><Loader2 className="h-4 w-4 animate-spin" />Checking Google authorization…</div> : connected ? <div className="mt-1 flex flex-wrap items-center gap-2 text-sm font-semibold text-stone-900"><CheckCircle2 className="h-4 w-4 text-emerald-600" />{data?.displayName || data?.email}<span className="font-normal text-stone-500">{data?.email}</span></div> : <div className="mt-1 flex items-center gap-2 text-sm font-semibold text-stone-700"><AlertCircle className="h-4 w-4 text-amber-600" />{reconnect ? `Reconnect required · ${data?.email || ''}` : 'Not connected'}</div>}
+            {callback && <div role="status" className={callback.success ? 'mt-1 text-xs text-emerald-700' : 'mt-1 text-xs text-red-700'}>{callback.message}</div>}
             {error && <div className="mt-1 text-xs text-red-700">{error}</div>}
           </div>
         </div>

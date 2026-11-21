@@ -1,4 +1,4 @@
-import { assertDeliveryAdmin, getDriveAccessToken, getDriveConnection } from './_lib/driveAuth.js';
+import { assertDeliveryAdmin, DeliveryAdminAuthError, DriveReconnectError, getDriveAccessToken, getDriveConnection } from './_lib/driveAuth.js';
 
 type VercelRequest = any;
 type VercelResponse = any;
@@ -13,13 +13,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await assertDeliveryAdmin(String(body.adminToken || '').trim());
     const connection = await getDriveConnection();
     if (!connection) return json(res, 200, { status: 'disconnected', email: null, connectedAt: null });
-    const accessToken = await getDriveAccessToken();
+    let accessToken: string;
+    try {
+      accessToken = await getDriveAccessToken();
+    } catch (error) {
+      if (!(error instanceof DriveReconnectError)) throw error;
+      return json(res, 200, { status: 'reconnect_required', email: connection.account_email, connectedAt: connection.connected_at, error: error.message });
+    }
     const response = await fetch('https://www.googleapis.com/drive/v3/about?fields=user(displayName,emailAddress)', { headers: { Authorization: `Bearer ${accessToken}` } });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data?.user?.emailAddress) return json(res, 200, { status: 'reconnect_required', email: connection.account_email, connectedAt: connection.connected_at });
     return json(res, 200, { status: 'connected', email: String(data.user.emailAddress), displayName: String(data.user.displayName || ''), connectedAt: connection.connected_at });
   } catch (error: any) {
-    const status = /admin session/i.test(String(error?.message || '')) ? 401 : 503;
+    const status = error instanceof DeliveryAdminAuthError ? 401 : 503;
     return json(res, status, { status: 'error', error: error?.message || 'Drive status check failed.' });
   }
 }

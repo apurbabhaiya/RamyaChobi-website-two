@@ -1,11 +1,10 @@
-import { assertDeliveryAdmin, decryptDriveSecret, encryptDriveSecret, supabaseServiceRequest } from './_lib/driveAuth.js';
+import { assertDeliveryAdmin, decryptDriveSecret, encryptDriveSecret, getDriveOAuthRedirectUri, supabaseServiceRequest } from './_lib/driveAuth.js';
 
 type VercelRequest = any;
 type VercelResponse = any;
 function finish(res: VercelResponse, state: 'connected' | 'error', message?: string) {
-  const base = process.env.APP_URL || '';
-  if (!base) return res.status(503).send('APP_URL is not configured.');
-  const target = new URL('/delivery-admin', base);
+  const target = new URL('/delivery-admin', getDriveOAuthRedirectUri());
+  target.searchParams.set('tab', 'settings');
   target.searchParams.set('drive', state);
   if (message) target.searchParams.set('driveError', message.slice(0, 160));
   return res.status(302).setHeader('location', target.toString()).setHeader('cache-control','no-store').end();
@@ -28,7 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID || '';
     const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET || '';
-    const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || '';
+    const redirectUri = getDriveOAuthRedirectUri();
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, grant_type: 'authorization_code' }),

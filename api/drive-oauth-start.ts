@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { assertDeliveryAdmin, encryptDriveSecret, supabaseServiceRequest } from './_lib/driveAuth.js';
+import { assertDeliveryAdmin, DeliveryAdminAuthError, encryptDriveSecret, getDriveOAuthRedirectUri, supabaseServiceRequest } from './_lib/driveAuth.js';
 
 type VercelRequest = any;
 type VercelResponse = any;
@@ -14,8 +14,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const adminToken = String(body.adminToken || '').trim();
     await assertDeliveryAdmin(adminToken);
     const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID || '';
-    const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || '';
-    if (!clientId || !redirectUri || !process.env.GOOGLE_OAUTH_CLIENT_SECRET || !process.env.GOOGLE_TOKEN_ENCRYPTION_KEY) {
+    const redirectUri = getDriveOAuthRedirectUri();
+    if (!clientId || !process.env.GOOGLE_OAUTH_CLIENT_SECRET || !process.env.GOOGLE_TOKEN_ENCRYPTION_KEY) {
       return json(res, 503, { error: 'Google OAuth is not configured on the server.' });
     }
     const state = randomBytes(32).toString('hex');
@@ -39,6 +39,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }).toString();
     return json(res, 200, { authorizationUrl: url.toString() });
   } catch (error: any) {
-    return json(res, 401, { error: error?.message || 'Could not connect Google Drive.' });
+    return json(res, error instanceof DeliveryAdminAuthError ? 401 : 503, { error: error?.message || 'Could not connect Google Drive.' });
   }
 }
