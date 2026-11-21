@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '../services/supabase';
 
 type Message = { role: 'assistant' | 'user'; text: string; links?: { label: string; href: string }[] };
 type VoiceLanguage = 'bn' | 'en';
@@ -64,7 +63,7 @@ export default function RamyaChatWidget() {
     const question = value.trim();
     if (!question || busy) return;
 
-    const responseLanguage: VoiceLanguage = preferredLanguage || (/[ \u0980-\u09FF]/.test(question) ? 'bn' : 'en');
+    const responseLanguage: VoiceLanguage = preferredLanguage || (/[\u0980-\u09FF]/.test(question) ? 'bn' : language);
     const previousHistory = messages.filter(message => message.role === 'user').slice(-8).map(message => message.text);
     setMessages(previous => [...previous, { role: 'user', text: question }]);
     setInput('');
@@ -72,9 +71,9 @@ export default function RamyaChatWidget() {
     setStatus(responseLanguage === 'bn' ? 'উত্তর তৈরি হচ্ছে…' : 'Preparing an answer…');
 
     try {
-      const response = await fetch(SUPABASE_URL + '/functions/v1/public-chat', {
+      const response = await fetch('/api/voice-chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', apikey: SUPABASE_PUBLISHABLE_KEY },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: question, history: previousHistory, language: responseLanguage }),
       });
       const data = await response.json().catch(() => ({}));
