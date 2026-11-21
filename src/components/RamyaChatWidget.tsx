@@ -9,7 +9,7 @@ const englishSuggestions = ['Wedding packages', 'How can I book?', 'Show me your
 const allowedLinks = ['/booking', '/booking?intent=discussion', '/booking/city', '/packages', '/portfolio', '/stories'];
 
 export default function RamyaChatWidget() {
-  const [visible, setVisible] = useState(true);
+  const [visible, setVisible] = useState(false);
   const [open, setOpen] = useState(false);
   const [language, setLanguage] = useState<VoiceLanguage>('bn');
   const [input, setInput] = useState('');
@@ -177,7 +177,7 @@ export default function RamyaChatWidget() {
     <button
       type="button"
       className="ramya-voice-launcher"
-      onClick={() => setVisible(true)}
+      onClick={() => { setVisible(true); setOpen(true); }}
       aria-label="RamyaChobi Voice Assistant আবার খুলুন"
       title="Open RamyaChobi Assistant"
     >🎙</button>
